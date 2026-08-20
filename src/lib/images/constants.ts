@@ -33,3 +33,7 @@ export const MAX_RESULT_DATA_URL_CHARS = 3_200_000;
 
 /** Server-side guard if a client skips compression. */
 export const MAX_EXAMPLE_UPLOAD_BYTES = 1_500_000;
+
+export const MIN_FEED_IMPORT = 1;
+export const DEFAULT_FEED_IMPORT = 8;
+export const MAX_FEED_IMPORT = 12;

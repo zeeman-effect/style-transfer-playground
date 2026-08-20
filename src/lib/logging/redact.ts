@@ -13,6 +13,8 @@ const SECRET_FIELD_NAMES = new Set([
   "secret",
   "encryption_key",
   "better_auth_secret",
+  "instagramcookie",
+  "instagram_cookie",
 ]);
 
 const STRING_SECRET_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [

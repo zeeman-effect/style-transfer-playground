@@ -18,7 +18,7 @@ export default async function SettingsPage() {
           API keys
         </h2>
         <div className="mt-6">
-          <SettingsForm saved={saved} />
+          <SettingsForm userId={session.user.id} saved={saved} />
         </div>
       </section>
     </main>
