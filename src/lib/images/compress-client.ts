@@ -143,5 +143,10 @@ export async function compressDataUrlIfOversized(
 export async function compressResultDataUrls(
   images: string[],
 ): Promise<string[]> {
-  return Promise.all(images.map((image) => compressDataUrlIfOversized(image)));
+  const maxCharsPerImage = Math.floor(
+    MAX_RESULT_DATA_URL_CHARS / Math.max(images.length, 1),
+  );
+  return Promise.all(
+    images.map((image) => compressDataUrlIfOversized(image, maxCharsPerImage)),
+  );
 }

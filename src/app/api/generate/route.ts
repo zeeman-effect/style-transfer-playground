@@ -17,8 +17,11 @@ import { generateMemeImages } from "@/lib/generation/pipeline";
 import type { WrapModelProvider } from "@/lib/generation/providers/types";
 import { getAnalyzerById } from "@/lib/generation/style/registry";
 import {
+  DEFAULT_GENERATE_IMAGE_COUNT,
   GenerationClientError,
   GenerationUpstreamError,
+  MAX_GENERATE_IMAGE_COUNT,
+  MIN_GENERATE_IMAGE_COUNT,
 } from "@/lib/generation/types";
 import {
   createGenerationRunLogger,
@@ -120,6 +123,14 @@ export async function POST(request: Request) {
         ? sourceValue
         : undefined;
 
+    const count = parseImageCount(formData.get("count"));
+    if (count === null) {
+      return fail(
+        `Count must be an integer of at least ${MIN_GENERATE_IMAGE_COUNT}.`,
+        400,
+      );
+    }
+
     const prompt = promptValue.trim();
     activeRun.setRequest({
       prompt,
@@ -128,6 +139,7 @@ export async function POST(request: Request) {
       analysisModelId,
       exampleCount: examples.length,
       hasSourceImage: Boolean(sourceImage),
+      imageCount: count,
     });
 
     const wrapProvider: WrapModelProvider = (provider) =>
@@ -141,6 +153,7 @@ export async function POST(request: Request) {
         analyzerId,
         analysisModelId,
         sourceImage,
+        count,
         keys,
       },
       {
@@ -185,4 +198,29 @@ export async function POST(request: Request) {
       await run.finish();
     }
   }
+}
+
+function parseImageCount(value: FormDataEntryValue | null): number | null {
+  if (value === null) {
+    return DEFAULT_GENERATE_IMAGE_COUNT;
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return DEFAULT_GENERATE_IMAGE_COUNT;
+  }
+
+  if (!/^\d+$/.test(trimmed)) {
+    return null;
+  }
+
+  const count = Number.parseInt(trimmed, 10);
+  if (!Number.isInteger(count) || count < MIN_GENERATE_IMAGE_COUNT) {
+    return null;
+  }
+
+  return Math.min(count, MAX_GENERATE_IMAGE_COUNT);
 }

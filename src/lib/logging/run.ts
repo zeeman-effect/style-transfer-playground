@@ -42,7 +42,6 @@ export class GenerationRunLogger {
   private readonly imagePaths: GenerationRunImagePaths = {
     examples: [],
     candidates: [],
-    ranked: [],
   };
 
   constructor(userId: string) {
@@ -76,6 +75,7 @@ export class GenerationRunLogger {
       analysisModelId: request.analysisModelId,
       exampleCount: request.exampleCount,
       hasSourceImage: request.hasSourceImage,
+      imageCount: request.imageCount,
     };
   }
 
@@ -129,16 +129,6 @@ export class GenerationRunLogger {
     );
     if (relative) {
       this.imagePaths.candidates[index] = relative;
-    }
-  }
-
-  async saveRankedImage(index: number, image: GeneratedImage): Promise<void> {
-    const relative = await this.saveGenerated(
-      ["images", "ranked", String(index)],
-      image,
-    );
-    if (relative) {
-      this.imagePaths.ranked[index] = relative;
     }
   }
 
@@ -219,7 +209,6 @@ export class GenerationRunLogger {
         source: this.imagePaths.source,
         composite: this.imagePaths.composite,
         candidates: compactSparse(this.imagePaths.candidates),
-        ranked: compactSparse(this.imagePaths.ranked),
       },
     };
 

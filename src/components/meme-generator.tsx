@@ -16,13 +16,16 @@ import {
   dataUrlToFile,
 } from "@/lib/images/compress-client";
 import { MAX_PROJECT_EXAMPLES } from "@/lib/images/constants";
-import type {
-  AnalyzerCatalogEntry,
-  GenerationConfigResponse,
-  GenerationModel,
-  ProjectSnapshot,
-  ProviderId,
-  StoredExample,
+import {
+  type AnalyzerCatalogEntry,
+  DEFAULT_GENERATE_IMAGE_COUNT,
+  type GenerationConfigResponse,
+  type GenerationModel,
+  MAX_GENERATE_IMAGE_COUNT,
+  MIN_GENERATE_IMAGE_COUNT,
+  type ProjectSnapshot,
+  type ProviderId,
+  type StoredExample,
 } from "@/lib/generation/types";
 
 type ExampleImage = {
@@ -143,6 +146,23 @@ function pickExperimentSelection(
   };
 }
 
+function parseRequestedImageCount(value: string): number | null {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return null;
+  }
+  const count = Number.parseInt(trimmed, 10);
+  return Number.isInteger(count) ? count : null;
+}
+
+function resolveGenerateImageCount(value: string): number {
+  const parsed = parseRequestedImageCount(value);
+  if (parsed === null || parsed < MIN_GENERATE_IMAGE_COUNT) {
+    return DEFAULT_GENERATE_IMAGE_COUNT;
+  }
+  return Math.min(parsed, MAX_GENERATE_IMAGE_COUNT);
+}
+
 function missingKeyMessage(provider: ProviderId, signedIn: boolean): string {
   const label = PROVIDER_LABELS[provider];
   const action = signedIn
@@ -210,6 +230,7 @@ export function MemeGenerator({
   const imageModelId = useId();
   const analyzerFieldId = useId();
   const analysisModelFieldId = useId();
+  const imageCountFieldId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const examplesRef = useRef<ExampleImage[]>([]);
   const cachedSelectionRef = useRef<CachedExperimentSelection>({
@@ -248,6 +269,9 @@ export function MemeGenerator({
   );
   const [selectedAnalysisModelId, setSelectedAnalysisModelId] = useState(
     initialSnapshot?.analysisModelId ?? "",
+  );
+  const [imageCount, setImageCount] = useState(
+    String(DEFAULT_GENERATE_IMAGE_COUNT),
   );
   const [styleHint, setStyleHint] = useState(initialSnapshot?.styleHint ?? "");
   const [config, setConfig] = useState<GenerationConfigResponse | null>(null);
@@ -546,8 +570,15 @@ export function MemeGenerator({
         config?.configured[selectedAnalysisModel.provider],
     );
   const requestInFlight = isGenerating || isModifying;
+  const requestedImageCount = parseRequestedImageCount(imageCount);
+  const imageCountOverMax =
+    requestedImageCount !== null &&
+    requestedImageCount > MAX_GENERATE_IMAGE_COUNT;
   const generateDisabled =
-    requestInFlight || !imageProviderConfigured || !analysisProviderConfigured;
+    requestInFlight ||
+    !imageProviderConfigured ||
+    !analysisProviderConfigured ||
+    imageCountOverMax;
   const selectedImage =
     selectedIndex !== null ? resultImages[selectedIndex] : undefined;
   const modifyDisabled =
@@ -784,6 +815,7 @@ export function MemeGenerator({
     formData.set("model", selectedModelId);
     formData.set("analyzer", selectedAnalyzerId);
     formData.set("analysisModel", selectedAnalysisModelId);
+    formData.set("count", String(resolveGenerateImageCount(imageCount)));
   }
 
   async function applyGeneratedResult(result: {
@@ -1103,7 +1135,31 @@ export function MemeGenerator({
                   })}
                 </select>
               </label>
+
+              <label htmlFor={imageCountFieldId} className="block">
+                <span className="text-sm font-medium text-foreground">
+                  Images
+                </span>
+                <input
+                  id={imageCountFieldId}
+                  name="count"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={imageCount}
+                  onChange={(event) => {
+                    setImageCount(event.target.value);
+                  }}
+                  className={SELECT_CLASS}
+                />
+              </label>
             </div>
+
+            {imageCountOverMax ? (
+              <p className="mt-3 text-sm text-amber-300" role="status">
+                The program can only generate {MAX_GENERATE_IMAGE_COUNT} at a time.
+              </p>
+            ) : null}
 
             {warning && (
               <p className="mt-3 text-sm text-amber-300" role="status">

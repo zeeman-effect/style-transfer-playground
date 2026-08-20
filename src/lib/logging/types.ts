@@ -15,6 +15,7 @@ export type GenerationRunRequestMeta = {
   analysisModelId?: string;
   exampleCount: number;
   hasSourceImage: boolean;
+  imageCount: number;
 };
 
 export type GenerationRunImagePaths = {
@@ -22,7 +23,6 @@ export type GenerationRunImagePaths = {
   source?: string;
   composite?: string;
   candidates: string[];
-  ranked: string[];
 };
 
 export type ModelCallRecord = {

@@ -1,19 +1,17 @@
 import { createModelProvider } from "./providers";
 import type { WrapModelProvider } from "./providers/types";
-import { RandomImageRanker } from "./rank/random-ranker";
 import { createStyleAnalyzer } from "./style/registry";
 import type { StyleAnalyzer } from "./style/analyzer";
-import type { ImageRanker } from "./rank/ranker";
-import type {
-  GenerateMemeImagesInput,
-  GenerateMemeImagesResult,
-  GeneratedImage,
+import {
+  type GenerateMemeImagesInput,
+  type GenerateMemeImagesResult,
+  type GeneratedImage,
+  GenerationClientError,
+  GenerationUpstreamError,
+  MAX_GENERATE_IMAGE_COUNT,
+  MIN_GENERATE_IMAGE_COUNT,
 } from "./types";
-import { GenerationUpstreamError } from "./types";
 import type { GenerationRunLogger } from "@/lib/logging";
-
-export const CANDIDATE_COUNT = 1;
-export const RESULT_COUNT = 1;
 
 const OVERLAY_EXCLUSION_SECTION = `Do not copy watermarks or attribution:
 Never reproduce watermarks, usernames, @handles, logos, timestamps, like/comment bars, or other platform UI from any example or reference image. Do not invent similar marks. Leave the image free of branding and account names unless the prompt explicitly asks for them.`;
@@ -33,9 +31,20 @@ function toDataUrl(image: GeneratedImage): string {
   return `data:${image.mimeType};base64,${base64}`;
 }
 
+function assertGenerateImageCount(count: number): void {
+  if (
+    !Number.isInteger(count) ||
+    count < MIN_GENERATE_IMAGE_COUNT ||
+    count > MAX_GENERATE_IMAGE_COUNT
+  ) {
+    throw new GenerationClientError(
+      `Count must be an integer from ${MIN_GENERATE_IMAGE_COUNT} to ${MAX_GENERATE_IMAGE_COUNT}.`,
+    );
+  }
+}
+
 export type GenerateMemeImagesDeps = {
   styleAnalyzer?: StyleAnalyzer;
-  ranker?: ImageRanker;
   wrapProvider?: WrapModelProvider;
   runLogger?: GenerationRunLogger;
 };
@@ -44,6 +53,8 @@ export async function generateMemeImages(
   input: GenerateMemeImagesInput,
   deps: GenerateMemeImagesDeps = {},
 ): Promise<GenerateMemeImagesResult> {
+  assertGenerateImageCount(input.count);
+
   const wrapProvider: WrapModelProvider =
     deps.wrapProvider ?? ((provider) => provider);
   const styleAnalyzer =
@@ -55,7 +66,6 @@ export async function generateMemeImages(
       wrapProvider,
       deps.runLogger,
     );
-  const ranker = deps.ranker ?? new RandomImageRanker();
   const provider = wrapProvider(createModelProvider(input.modelId, input.keys));
   const runLogger = deps.runLogger;
 
@@ -79,45 +89,35 @@ export async function generateMemeImages(
       ? analysis.referenceImages
       : undefined;
 
-  const candidates = input.sourceImage
+  const generated = input.sourceImage
     ? await provider.imageAndTextToImage({
         prompt: combinedPrompt,
         image: input.sourceImage,
         images: referenceImages,
-        count: CANDIDATE_COUNT,
+        count: input.count,
         modelId: input.modelId,
       })
     : await provider.textToImage({
         prompt: combinedPrompt,
         images: referenceImages,
-        count: CANDIDATE_COUNT,
+        count: input.count,
         modelId: input.modelId,
       });
 
-  if (candidates.length < RESULT_COUNT) {
-    throw new GenerationUpstreamError(
-      `Only ${candidates.length} image(s) were generated; need at least ${RESULT_COUNT}.`,
-    );
+  if (generated.length === 0) {
+    throw new GenerationUpstreamError("No images were generated.");
   }
 
   if (runLogger) {
     await Promise.all(
-      candidates.map((candidate, index) =>
-        runLogger.saveCandidateImage(index, candidate),
+      generated.map((image, index) =>
+        runLogger.saveCandidateImage(index, image),
       ),
     );
   }
 
-  const ranked = await ranker.rank(candidates, RESULT_COUNT);
-
-  if (runLogger) {
-    await Promise.all(
-      ranked.map((image, index) => runLogger.saveRankedImage(index, image)),
-    );
-  }
-
   return {
-    images: ranked.map(toDataUrl),
+    images: generated.map(toDataUrl),
     styleHint,
   };
 }

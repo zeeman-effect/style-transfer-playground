@@ -97,6 +97,7 @@ In the project: **Environment Variables**. Add these for **Production**. Leave n
 | `TURSO_AUTH_TOKEN` | Token from step 1 |
 | `GOOGLE_CLIENT_ID` | Same web client as local |
 | `GOOGLE_CLIENT_SECRET` | Same web client as local |
+| `SITE_PASSWORD` | Shared password for the site gate. Visitors must enter it before Google sign-in. Share this over Discord; do not commit it. |
 
 Do not put Google Gemini or OpenAI keys here. Testers enter those in Settings after sign-in; they are stored encrypted in the database.
 
@@ -119,7 +120,7 @@ If you later attach a custom domain, add that origin and `https://<custom-domain
 
 ## 6. Smoke test
 
-1. Open the production URL. Sign in with Google.
+1. Open the production URL. Enter `SITE_PASSWORD`, then sign in with Google.
 2. Settings: save a Google and/or OpenAI provider key.
 3. Create or open a project, upload example images, generate.
 
@@ -133,3 +134,4 @@ If sign-in fails with `redirect_uri_mismatch`, the callback URI in Google does n
 - **Preview database:** Sharing the production Turso database with Preview writes test users and keys into production data. Use a separate Turso database (and its own `ENCRYPTION_KEY`) for Preview if you need that isolation.
 - **Function duration:** `src/app/api/generate/route.ts` already sets `maxDuration = 300`. On Hobby that is the plan maximum (5 minutes).
 - **Schema later:** When `schema.ts` changes, run step 2 again from your laptop, then deploy the matching code. The Vercel build does not apply schema.
+- **Site password:** This is an app-level gate (Hobby-safe). It is not Vercel Password Protection. Leave `SITE_PASSWORD` unset locally to skip it. Changing the value invalidates existing site-access cookies.

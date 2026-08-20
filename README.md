@@ -30,6 +30,7 @@ Copy `.env.example`. Do not commit `.env`.
 | `DATABASE_URL` | Local SQLite (`file:./data/app.db`) or a Turso URL (`libsql://…`) |
 | `TURSO_AUTH_TOKEN` | Turso auth token. Required when `DATABASE_URL` is not a `file:` path; unused locally |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client for sign-in |
+| `SITE_PASSWORD` | Optional shared site password. When set, visitors must enter it before using the app (including Google sign-in). Leave empty locally if you do not want a gate |
 
 Generation API keys (Google, OpenAI) are entered in Settings after sign-in. They are stored encrypted in the database, not in `.env`.
 

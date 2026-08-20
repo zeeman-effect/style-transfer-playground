@@ -54,6 +54,10 @@ export type GeneratedImage = {
   mimeType: string;
 };
 
+export const MIN_GENERATE_IMAGE_COUNT = 1;
+export const MAX_GENERATE_IMAGE_COUNT = 6;
+export const DEFAULT_GENERATE_IMAGE_COUNT = 1;
+
 export type AnalyzerCatalogEntry = {
   id: string;
   label: string;
@@ -67,6 +71,7 @@ export type GenerateMemeImagesInput = {
   analyzerId: string;
   analysisModelId?: string;
   sourceImage?: File;
+  count: number;
   keys: ProviderKeys;
 };
 

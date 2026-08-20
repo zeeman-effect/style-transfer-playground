@@ -1,13 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
 const buttonClass =
   "rounded-xl border-2 border-panel-edge bg-panel px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent/70";
 
 export function SiteHeader() {
+  const pathname = usePathname();
+  if (pathname === "/unlock") {
+    return (
+      <header className="border-b-2 border-panel-edge px-6 py-8 sm:px-10">
+        <h1 className="font-display text-5xl tracking-wide text-foreground sm:text-6xl">
+          Style Transfer Playground
+        </h1>
+      </header>
+    );
+  }
+
+  return <SignedInSiteHeader />;
+}
+
+function SignedInSiteHeader() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
 
