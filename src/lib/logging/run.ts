@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ProviderId } from "@/lib/generation/types";
-import type { GeneratedImage } from "@/lib/generation/types";
+import type { StoredGenerationRunCall } from "@/lib/db/schema";
+import type { GeneratedImage, ProviderId } from "@/lib/generation/types";
+import { isLocalFilesystemLogging } from "./env";
 import { tryAppendJsonl, tryWriteJsonFile } from "./jsonl";
 import {
   extensionForMimeType,
@@ -11,7 +12,8 @@ import {
   toLogPath,
   userLogsDir,
 } from "./paths";
-import { warnLoggingFailure } from "./redact";
+import { tryPersistGenerationRun } from "./persist-run";
+import { redactString, warnLoggingFailure } from "./redact";
 import type {
   GenerationRunImagePaths,
   GenerationRunRequestMeta,
@@ -31,10 +33,12 @@ export class GenerationRunLogger {
   private callSeq = 0;
   private writeChain: Promise<void> = Promise.resolve();
   private request: GenerationRunRequestMeta | undefined;
+  private projectId: string | undefined;
   private configuredProviders: Record<ProviderId, boolean> | undefined;
   private styleHint: string | undefined;
   private success = false;
   private errorMessage: string | undefined;
+  private readonly storedCalls: StoredGenerationRunCall[] = [];
   private readonly imagePaths: GenerationRunImagePaths = {
     examples: [],
     candidates: [],
@@ -51,6 +55,10 @@ export class GenerationRunLogger {
   nextCallSeq(): number {
     this.callSeq += 1;
     return this.callSeq;
+  }
+
+  setProjectId(projectId: string): void {
+    this.projectId = projectId;
   }
 
   setConfiguredProviders(configured: Record<ProviderId, boolean>): void {
@@ -104,6 +112,13 @@ export class GenerationRunLogger {
     }
   }
 
+  async saveCompositeImage(file: File): Promise<void> {
+    const relative = await this.saveFile(["images", "composite"], file);
+    if (relative) {
+      this.imagePaths.composite = relative;
+    }
+  }
+
   async saveCandidateImage(
     index: number,
     image: GeneratedImage,
@@ -127,8 +142,16 @@ export class GenerationRunLogger {
     }
   }
 
-  async saveCallInputImage(seq: number, file: File): Promise<string | undefined> {
-    return this.saveFile(["images", "calls", `${padSeq(seq)}-input`], file);
+  async saveCallInputImage(
+    seq: number,
+    file: File,
+    index?: number,
+  ): Promise<string | undefined> {
+    const stem =
+      index === undefined
+        ? `${padSeq(seq)}-input`
+        : `${padSeq(seq)}-input-${index}`;
+    return this.saveFile(["images", "calls", stem], file);
   }
 
   async saveCallOutputImages(
@@ -149,6 +172,11 @@ export class GenerationRunLogger {
   }
 
   async recordCall(record: ModelCallRecord): Promise<void> {
+    this.storedCalls.push(toStoredCall(record));
+    if (!isLocalFilesystemLogging()) {
+      return;
+    }
+
     const filePath = runFilePath(this.userId, this.runId, "calls.jsonl");
     await this.enqueue(async () => {
       await tryAppendJsonl("calls", filePath, record);
@@ -189,10 +217,39 @@ export class GenerationRunLogger {
       images: {
         examples: compactSparse(this.imagePaths.examples),
         source: this.imagePaths.source,
+        composite: this.imagePaths.composite,
         candidates: compactSparse(this.imagePaths.candidates),
         ranked: compactSparse(this.imagePaths.ranked),
       },
     };
+
+    await tryPersistGenerationRun({
+      id: this.runId,
+      userId: this.userId,
+      projectId: this.projectId ?? null,
+      prompt: redactString(this.request?.prompt ?? ""),
+      modelId: this.request?.modelId ?? "",
+      analyzerId: this.request?.analyzerId ?? "",
+      analysisModelId: this.request?.analysisModelId ?? null,
+      exampleCount: this.request?.exampleCount ?? 0,
+      hasSourceImage: this.request?.hasSourceImage ?? false,
+      styleHint: this.styleHint ? redactString(this.styleHint) : null,
+      success: this.success,
+      error: this.success
+        ? null
+        : this.errorMessage
+          ? redactString(this.errorMessage)
+          : null,
+      durationMs,
+      configuredProviders,
+      calls: this.storedCalls,
+      startedAt: new Date(this.startedAtMs),
+      finishedAt: new Date(),
+    });
+
+    if (!isLocalFilesystemLogging()) {
+      return;
+    }
 
     await this.enqueue(async () => {
       await tryWriteJsonFile(
@@ -221,6 +278,10 @@ export class GenerationRunLogger {
     segmentsWithoutExt: string[],
     file: File,
   ): Promise<string | undefined> {
+    if (!isLocalFilesystemLogging()) {
+      return undefined;
+    }
+
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       return await this.writeImageBytes(
@@ -238,6 +299,10 @@ export class GenerationRunLogger {
     segmentsWithoutExt: string[],
     image: GeneratedImage,
   ): Promise<string | undefined> {
+    if (!isLocalFilesystemLogging()) {
+      return undefined;
+    }
+
     try {
       return await this.writeImageBytes(
         segmentsWithoutExt,
@@ -255,6 +320,10 @@ export class GenerationRunLogger {
     bytes: Uint8Array,
     mimeType: string,
   ): Promise<string | undefined> {
+    if (!isLocalFilesystemLogging()) {
+      return undefined;
+    }
+
     const extension = extensionForMimeType(mimeType);
     const relative = toLogPath(...segmentsWithoutExt) + `.${extension}`;
     const absPath = path.join(
@@ -277,6 +346,23 @@ export class GenerationRunLogger {
 
 export function createGenerationRunLogger(userId: string): GenerationRunLogger {
   return new GenerationRunLogger(userId);
+}
+
+function toStoredCall(record: ModelCallRecord): StoredGenerationRunCall {
+  const stored: StoredGenerationRunCall = {
+    seq: record.seq,
+    kind: record.kind,
+    modelId: record.modelId,
+    prompt: redactString(record.prompt),
+    latencyMs: record.latencyMs,
+  };
+  if (record.provider) {
+    stored.provider = record.provider;
+  }
+  if (record.error) {
+    stored.error = redactString(record.error);
+  }
+  return stored;
 }
 
 function padSeq(seq: number): string {

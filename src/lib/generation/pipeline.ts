@@ -15,12 +15,17 @@ import type { GenerationRunLogger } from "@/lib/logging";
 export const CANDIDATE_COUNT = 1;
 export const RESULT_COUNT = 1;
 
+const OVERLAY_EXCLUSION_SECTION = `Do not copy watermarks or attribution:
+Never reproduce watermarks, usernames, @handles, logos, timestamps, like/comment bars, or other platform UI from any example or reference image. Do not invent similar marks. Leave the image free of branding and account names unless the prompt explicitly asks for them.`;
+
 function buildPrompt(prompt: string, styleHint: string): string {
+  const sections = [prompt.trim()];
   const trimmedHint = styleHint.trim();
-  if (!trimmedHint) {
-    return prompt;
+  if (trimmedHint) {
+    sections.push(`Style guidance: ${trimmedHint}`);
   }
-  return `${prompt}\n\nStyle guidance: ${trimmedHint}`;
+  sections.push(OVERLAY_EXCLUSION_SECTION);
+  return sections.join("\n\n");
 }
 
 function toDataUrl(image: GeneratedImage): string {
@@ -48,6 +53,7 @@ export async function generateMemeImages(
       input.analysisModelId,
       input.keys,
       wrapProvider,
+      deps.runLogger,
     );
   const ranker = deps.ranker ?? new RandomImageRanker();
   const provider = wrapProvider(createModelProvider(input.modelId, input.keys));
@@ -64,19 +70,26 @@ export async function generateMemeImages(
     }
   }
 
-  const styleHint = await styleAnalyzer.analyze(input.examples);
+  const analysis = await styleAnalyzer.analyze(input.examples);
+  const styleHint = analysis.styleHint;
   runLogger?.setStyleHint(styleHint);
   const combinedPrompt = buildPrompt(input.prompt, styleHint);
+  const referenceImages =
+    analysis.referenceImages && analysis.referenceImages.length > 0
+      ? analysis.referenceImages
+      : undefined;
 
   const candidates = input.sourceImage
     ? await provider.imageAndTextToImage({
         prompt: combinedPrompt,
         image: input.sourceImage,
+        images: referenceImages,
         count: CANDIDATE_COUNT,
         modelId: input.modelId,
       })
     : await provider.textToImage({
         prompt: combinedPrompt,
+        images: referenceImages,
         count: CANDIDATE_COUNT,
         modelId: input.modelId,
       });

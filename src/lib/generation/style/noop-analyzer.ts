@@ -1,8 +1,8 @@
-import type { StyleAnalyzer } from "./analyzer";
+import type { StyleAnalysis, StyleAnalyzer } from "./analyzer";
 
 export class NoopStyleAnalyzer implements StyleAnalyzer {
-  async analyze(examples: File[]): Promise<string> {
+  async analyze(examples: File[]): Promise<StyleAnalysis> {
     void examples;
-    return "";
+    return { styleHint: "" };
   }
 }

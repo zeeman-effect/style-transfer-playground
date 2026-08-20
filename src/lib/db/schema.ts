@@ -1,4 +1,5 @@
 import {
+  blob,
   index,
   integer,
   primaryKey,
@@ -6,7 +7,21 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import type { StoredExample } from "@/lib/generation/types";
+import type { ProviderId, StoredExample } from "@/lib/generation/types";
+
+export type StoredGenerationRunCall = {
+  seq: number;
+  kind:
+    | "imageToText"
+    | "textToText"
+    | "textToImage"
+    | "imageAndTextToImage";
+  provider?: ProviderId;
+  modelId: string;
+  prompt: string;
+  latencyMs: number;
+  error?: string;
+};
 
 export const user = sqliteTable("user", {
   id: text("id").primaryKey(),
@@ -155,4 +170,61 @@ export const project = sqliteTable(
     lastOpenedAt: integer("last_opened_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [index("project_userId_idx").on(table.userId)],
+);
+
+export const projectExample = sqliteTable(
+  "project_example",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    payload: blob("payload", { mode: "buffer" }).notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("project_example_projectId_sortOrder_idx").on(
+      table.projectId,
+      table.sortOrder,
+    ),
+  ],
+);
+
+export const generationRun = sqliteTable(
+  "generation_run",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    projectId: text("project_id"),
+    prompt: text("prompt").notNull(),
+    modelId: text("model_id").notNull(),
+    analyzerId: text("analyzer_id").notNull(),
+    analysisModelId: text("analysis_model_id"),
+    exampleCount: integer("example_count").notNull(),
+    hasSourceImage: integer("has_source_image", { mode: "boolean" }).notNull(),
+    styleHint: text("style_hint"),
+    success: integer("success", { mode: "boolean" }).notNull(),
+    error: text("error"),
+    durationMs: integer("duration_ms").notNull(),
+    configuredProviders: text("configured_providers", { mode: "json" })
+      .$type<Record<ProviderId, boolean>>()
+      .notNull(),
+    calls: text("calls", { mode: "json" })
+      .$type<StoredGenerationRunCall[]>()
+      .notNull(),
+    startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("generation_run_userId_idx").on(table.userId),
+    index("generation_run_startedAt_idx").on(table.startedAt),
+  ],
 );

@@ -1,7 +1,15 @@
 import { and, desc, eq } from "drizzle-orm";
+import {
+  countProjectExamples,
+  deleteProjectExamples,
+  insertLegacyExample,
+  listProjectExampleMeta,
+} from "@/lib/account/examples";
+import { ProjectNotFoundError } from "@/lib/account/errors";
 import { getUserGeneration } from "@/lib/account/generation";
 import { db } from "@/lib/db";
 import { project } from "@/lib/db/schema";
+import { MAX_PROJECT_EXAMPLES } from "@/lib/images/constants";
 import type {
   ProjectRecord,
   ProjectSnapshot,
@@ -9,21 +17,14 @@ import type {
   StoredExample,
 } from "@/lib/generation/types";
 
-export class ProjectNotFoundError extends Error {
-  readonly status = 404 as const;
-
-  constructor(message = "Project not found.") {
-    super(message);
-    this.name = "ProjectNotFoundError";
-  }
-}
+export { ProjectNotFoundError };
 
 export type ProjectListResult = {
   projects: ProjectSummary[];
   lastOpenedId: string;
 };
 
-export type ProjectPatch = Partial<ProjectSnapshot> & {
+export type ProjectPatch = Partial<Omit<ProjectSnapshot, "examples">> & {
   name?: string;
   opened?: boolean;
 };
@@ -54,7 +55,7 @@ function toSummary(row: {
   };
 }
 
-function toRecord(row: ProjectRow): ProjectRecord {
+function toRecord(row: ProjectRow, examples: StoredExample[]): ProjectRecord {
   return {
     id: row.id,
     name: row.name,
@@ -64,13 +65,54 @@ function toRecord(row: ProjectRow): ProjectRecord {
     analysisModelId: row.analysisModelId,
     styleHint: row.styleHint,
     images: row.images,
-    examples: row.examples,
+    examples,
     selectedIndex: row.selectedIndex,
     updateText: row.updateText,
     createdAt: row.createdAt.getTime(),
     updatedAt: row.updatedAt.getTime(),
     lastOpenedAt: row.lastOpenedAt.getTime(),
   };
+}
+
+function parseDataUrl(dataUrl: string): { mimeType: string; bytes: Buffer } | null {
+  const match = /^data:([^;,]+);base64,([\s\S]+)$/.exec(dataUrl);
+  if (!match || !match[1] || !match[2]) {
+    return null;
+  }
+  return {
+    mimeType: match[1],
+    bytes: Buffer.from(match[2], "base64"),
+  };
+}
+
+async function migrateLegacyExamples(row: ProjectRow): Promise<void> {
+  if (!Array.isArray(row.examples) || row.examples.length === 0) {
+    return;
+  }
+
+  const parsed = parseStoredExamples(row.examples);
+  const existing = await countProjectExamples(row.userId, row.id);
+  if (existing === 0 && parsed) {
+    let sortOrder = 0;
+    for (const example of parsed.slice(0, MAX_PROJECT_EXAMPLES)) {
+      const image = parseDataUrl(example.previewUrl);
+      if (!image) {
+        continue;
+      }
+      await insertLegacyExample(row.userId, row.id, {
+        name: example.name,
+        mimeType: image.mimeType,
+        bytes: image.bytes,
+        sortOrder,
+      });
+      sortOrder += 1;
+    }
+  }
+
+  await db
+    .update(project)
+    .set({ examples: [] })
+    .where(eq(project.id, row.id));
 }
 
 function nextUntitledName(names: string[]): string {
@@ -133,7 +175,7 @@ async function insertProject(
     analysisModelId: snapshot.analysisModelId,
     styleHint: snapshot.styleHint,
     images: snapshot.images,
-    examples: snapshot.examples,
+    examples: [],
     selectedIndex: snapshot.selectedIndex,
     updateText: snapshot.updateText,
     createdAt: now,
@@ -158,7 +200,13 @@ async function getOwnedProject(
     .where(and(eq(project.id, projectId), eq(project.userId, userId)))
     .limit(1);
 
-  return row ? toRecord(row) : null;
+  if (!row) {
+    return null;
+  }
+
+  await migrateLegacyExamples(row);
+  const examples = await listProjectExampleMeta(userId, projectId);
+  return toRecord(row, examples);
 }
 
 export async function listProjects(userId: string): Promise<ProjectListResult> {
@@ -246,9 +294,6 @@ export async function patchProject(
   if (patch.images !== undefined) {
     updates.images = patch.images;
   }
-  if (patch.examples !== undefined) {
-    updates.examples = patch.examples;
-  }
   if (patch.selectedIndex !== undefined) {
     updates.selectedIndex = patch.selectedIndex;
   }
@@ -309,6 +354,7 @@ export async function deleteProject(
     throw new ProjectNotFoundError();
   }
 
+  await deleteProjectExamples(userId, projectId);
   await db
     .delete(project)
     .where(and(eq(project.id, projectId), eq(project.userId, userId)));

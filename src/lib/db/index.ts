@@ -2,14 +2,15 @@ import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import {
+  getDatabaseAuthToken,
+  getDatabaseUrl,
+  isFileDatabaseUrl,
+} from "./credentials";
 import * as schema from "./schema";
 
-function getDatabaseUrl(): string {
-  return process.env.DATABASE_URL ?? "file:./data/app.db";
-}
-
 function ensureLocalDatabaseDir(url: string) {
-  if (!url.startsWith("file:")) {
+  if (!isFileDatabaseUrl(url)) {
     return;
   }
 
@@ -23,6 +24,9 @@ function ensureLocalDatabaseDir(url: string) {
 const databaseUrl = getDatabaseUrl();
 ensureLocalDatabaseDir(databaseUrl);
 
-const client = createClient({ url: databaseUrl });
+const client = createClient({
+  url: databaseUrl,
+  authToken: getDatabaseAuthToken(databaseUrl),
+});
 
 export const db = drizzle(client, { schema });

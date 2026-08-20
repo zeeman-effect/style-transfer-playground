@@ -29,6 +29,7 @@ export class LoggingModelProvider implements ModelProvider {
       kind: "textToImage",
       prompt: input.prompt,
       modelId: input.modelId,
+      images: input.images,
       execute: () => this.inner.textToImage(input),
       outputImages: (images) => images,
     });
@@ -41,7 +42,7 @@ export class LoggingModelProvider implements ModelProvider {
       kind: "imageAndTextToImage",
       prompt: input.prompt,
       modelId: input.modelId,
-      image: input.image,
+      images: [input.image, ...(input.images ?? [])],
       execute: () => this.inner.imageAndTextToImage(input),
       outputImages: (images) => images,
     });
@@ -52,7 +53,7 @@ export class LoggingModelProvider implements ModelProvider {
       kind: "imageToText",
       prompt: input.prompt,
       modelId: input.modelId,
-      image: input.image,
+      images: [input.image],
       execute: () => this.inner.imageToText(input),
       outputText: (text) => text,
     });
@@ -72,7 +73,7 @@ export class LoggingModelProvider implements ModelProvider {
     kind: ModelCallKind;
     prompt: string;
     modelId: string;
-    image?: File;
+    images?: File[];
     execute: () => Promise<T>;
     outputText?: (result: T) => string;
     outputImages?: (result: T) => GeneratedImage[];
@@ -80,9 +81,15 @@ export class LoggingModelProvider implements ModelProvider {
     const seq = this.run.nextCallSeq();
     const startedAt = Date.now();
     const inputImagePaths: string[] = [];
+    const inputImages = options.images ?? [];
+    const suffixIndex = inputImages.length > 1;
 
-    if (options.image) {
-      const inputPath = await this.run.saveCallInputImage(seq, options.image);
+    for (const [index, image] of inputImages.entries()) {
+      const inputPath = await this.run.saveCallInputImage(
+        seq,
+        image,
+        suffixIndex ? index : undefined,
+      );
       if (inputPath) {
         inputImagePaths.push(inputPath);
       }

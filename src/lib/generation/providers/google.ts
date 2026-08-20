@@ -1,3 +1,7 @@
+import {
+  capProviderInputImages,
+  MAX_GOOGLE_INPUT_IMAGES,
+} from "@/lib/images/constants";
 import type { GeneratedImage } from "../types";
 import { GenerationUpstreamError } from "../types";
 import type {
@@ -40,6 +44,10 @@ async function fileToInlinePart(file: File): Promise<GeminiPart> {
   };
 }
 
+async function filesToInlineParts(files: File[]): Promise<GeminiPart[]> {
+  return Promise.all(files.map(fileToInlinePart));
+}
+
 function textFromParts(parts: GeminiPart[]): string {
   return parts
     .map((part) => part.text?.trim())
@@ -52,18 +60,32 @@ export class GoogleModelProvider implements ModelProvider {
   constructor(private readonly apiKey: string) {}
 
   async textToImage(input: TextToImageInput): Promise<GeneratedImage[]> {
-    return this.generateImages(input.prompt, input.count, input.modelId);
+    const imageParts = await filesToInlineParts(
+      capProviderInputImages(MAX_GOOGLE_INPUT_IMAGES, undefined, input.images),
+    );
+    return this.generateImages(
+      input.prompt,
+      input.count,
+      input.modelId,
+      imageParts,
+    );
   }
 
   async imageAndTextToImage(
     input: ImageAndTextToImageInput,
   ): Promise<GeneratedImage[]> {
-    const sourcePart = await fileToInlinePart(input.image);
+    const imageParts = await filesToInlineParts(
+      capProviderInputImages(
+        MAX_GOOGLE_INPUT_IMAGES,
+        input.image,
+        input.images,
+      ),
+    );
     return this.generateImages(
       input.prompt,
       input.count,
       input.modelId,
-      sourcePart,
+      imageParts,
     );
   }
 
@@ -83,11 +105,11 @@ export class GoogleModelProvider implements ModelProvider {
     prompt: string,
     count: number,
     modelId: string,
-    sourcePart?: GeminiPart,
+    imageParts: GeminiPart[] = [],
   ): Promise<GeneratedImage[]> {
     const results = await Promise.allSettled(
       Array.from({ length: count }, () =>
-        this.generateOneImage(prompt, modelId, sourcePart),
+        this.generateOneImage(prompt, modelId, imageParts),
       ),
     );
 
@@ -108,11 +130,9 @@ export class GoogleModelProvider implements ModelProvider {
   private async generateOneImage(
     prompt: string,
     modelId: string,
-    sourcePart?: GeminiPart,
+    imageParts: GeminiPart[] = [],
   ): Promise<GeneratedImage> {
-    const parts: GeminiPart[] = sourcePart
-      ? [sourcePart, { text: prompt }]
-      : [{ text: prompt }];
+    const parts: GeminiPart[] = [...imageParts, { text: prompt }];
 
     const payload = await this.generateContent(modelId, parts, {
       responseModalities: ["TEXT", "IMAGE"],

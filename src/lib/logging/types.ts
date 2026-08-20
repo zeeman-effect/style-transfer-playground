@@ -20,6 +20,7 @@ export type GenerationRunRequestMeta = {
 export type GenerationRunImagePaths = {
   examples: string[];
   source?: string;
+  composite?: string;
   candidates: string[];
   ranked: string[];
 };

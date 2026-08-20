@@ -10,6 +10,12 @@ import {
 } from "react";
 import { ResultInspector } from "@/components/result-inspector";
 import { authClient } from "@/lib/auth-client";
+import {
+  compressImageFile,
+  compressResultDataUrls,
+  dataUrlToFile,
+} from "@/lib/images/compress-client";
+import { MAX_PROJECT_EXAMPLES } from "@/lib/images/constants";
 import type {
   AnalyzerCatalogEntry,
   GenerationConfigResponse,
@@ -173,59 +179,8 @@ function experimentWarning(
   return null;
 }
 
-async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-  return new File([blob], filename, { type: blob.type || "image/jpeg" });
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () =>
-      reject(reader.error ?? new Error("Could not read file."));
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function serializeExamples(
-  examples: ExampleImage[],
-): Promise<StoredExample[]> {
-  const stored: StoredExample[] = [];
-
-  for (const example of examples) {
-    if (example.previewUrl.startsWith("data:")) {
-      stored.push({
-        id: example.id,
-        name: example.name,
-        kind: "upload",
-        previewUrl: example.previewUrl,
-      });
-      continue;
-    }
-
-    if (example.file) {
-      stored.push({
-        id: example.id,
-        name: example.name,
-        kind: "upload",
-        previewUrl: await blobToDataUrl(example.file),
-      });
-      continue;
-    }
-
-    const response = await fetch(example.previewUrl);
-    const blob = await response.blob();
-    stored.push({
-      id: example.id,
-      name: example.name,
-      kind: "upload",
-      previewUrl: await blobToDataUrl(blob),
-    });
-  }
-
-  return stored;
+function isLocalExampleId(id: string): boolean {
+  return id.startsWith("local-");
 }
 
 function examplesFromSnapshot(snapshot?: ProjectSnapshot): ExampleImage[] {
@@ -276,6 +231,8 @@ export function MemeGenerator({
   const onSavedRef = useRef(onSaved);
   const saveGenerationRef = useRef(0);
   const debounceRef = useRef<number | null>(null);
+  const pendingUploadsRef = useRef(0);
+  const mountedRef = useRef(true);
 
   const [examples, setExamples] = useState<ExampleImage[]>(() =>
     examplesFromSnapshot(initialSnapshot),
@@ -334,12 +291,24 @@ export function MemeGenerator({
     }
 
     const generation = ++saveGenerationRef.current;
-    const storedExamples = await serializeExamples(examplesRef.current);
+    const images = keepalive
+      ? resultImagesRef.current
+      : await compressResultDataUrls(resultImagesRef.current);
     if (
       generation !== saveGenerationRef.current ||
       projectIdRef.current !== activeProjectId
     ) {
       return;
+    }
+
+    if (images !== resultImagesRef.current) {
+      const changed = images.some(
+        (image, index) => image !== resultImagesRef.current[index],
+      );
+      if (changed) {
+        resultImagesRef.current = images;
+        setResultImages(images);
+      }
     }
 
     const payload = {
@@ -349,7 +318,6 @@ export function MemeGenerator({
       analysisModelId: analysisModelIdRef.current || null,
       styleHint: styleHintRef.current,
       images: resultImagesRef.current,
-      examples: storedExamples,
       selectedIndex: selectedIndexRef.current,
       updateText: updateTextRef.current,
     };
@@ -399,7 +367,9 @@ export function MemeGenerator({
   useImperativeHandle(ref, () => ({ flushSave }), [flushSave]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       examplesRef.current.forEach((example) => {
         if (example.previewUrl.startsWith("blob:")) {
           URL.revokeObjectURL(example.previewUrl);
@@ -503,7 +473,6 @@ export function MemeGenerator({
     isGenerating,
     isModifying,
     prompt,
-    examples,
     selectedModelId,
     selectedAnalyzerId,
     selectedAnalysisModelId,
@@ -592,7 +561,26 @@ export function MemeGenerator({
     setSelectedIndex(null);
   }, []);
 
+  function waitForPendingUploads(): Promise<void> {
+    if (pendingUploadsRef.current <= 0) {
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      const timer = window.setInterval(() => {
+        if (pendingUploadsRef.current <= 0) {
+          window.clearInterval(timer);
+          resolve();
+        }
+      }, 50);
+    });
+  }
+
   function addFiles(fileList: FileList | File[]) {
+    void addFilesAsync(fileList);
+  }
+
+  async function addFilesAsync(fileList: FileList | File[]) {
     const imageFiles = Array.from(fileList).filter((file) =>
       file.type.startsWith("image/"),
     );
@@ -602,24 +590,131 @@ export function MemeGenerator({
       return;
     }
 
-    const nextExamples = imageFiles.map((file) => ({
-      id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+    const remaining = MAX_PROJECT_EXAMPLES - examplesRef.current.length;
+    if (remaining <= 0) {
+      setError(`You can add up to ${MAX_PROJECT_EXAMPLES} example images.`);
+      return;
+    }
+
+    const accepted = imageFiles.slice(0, remaining);
+    if (imageFiles.length > remaining) {
+      setError(`You can add up to ${MAX_PROJECT_EXAMPLES} example images.`);
+    } else {
+      setError(null);
+    }
+
+    const pending = accepted.map((file) => ({
+      id: `local-${crypto.randomUUID()}`,
       file,
       name: file.name,
       previewUrl: URL.createObjectURL(file),
     }));
 
-    setError(null);
     setExamples((current) => {
-      const next = [...current, ...nextExamples];
+      const next = [...current, ...pending];
       examplesRef.current = next;
       return next;
     });
+
+    const activeProjectId = projectIdRef.current;
+
+    for (const item of pending) {
+      pendingUploadsRef.current += 1;
+      try {
+        const sourceFile = item.file;
+        if (!sourceFile) {
+          continue;
+        }
+        const compressed = await compressImageFile(sourceFile);
+        if (!examplesRef.current.some((example) => example.id === item.id)) {
+          URL.revokeObjectURL(item.previewUrl);
+          continue;
+        }
+
+        if (!activeProjectId) {
+          if (!mountedRef.current) {
+            continue;
+          }
+          setExamples((current) => {
+            const next = current.map((example) =>
+              example.id === item.id
+                ? { ...example, file: compressed }
+                : example,
+            );
+            examplesRef.current = next;
+            return next;
+          });
+          continue;
+        }
+
+        const formData = new FormData();
+        formData.set("file", compressed);
+        const response = await fetch(
+          `/api/projects/${activeProjectId}/examples`,
+          { method: "POST", body: formData },
+        );
+        const data = (await response.json()) as {
+          example?: StoredExample;
+          error?: string;
+        };
+
+        if (!response.ok || !data.example) {
+          throw new Error(data.error || "Could not save example.");
+        }
+
+        if (!examplesRef.current.some((example) => example.id === item.id)) {
+          await fetch(
+            `/api/projects/${activeProjectId}/examples/${data.example.id}`,
+            { method: "DELETE" },
+          );
+          URL.revokeObjectURL(item.previewUrl);
+          continue;
+        }
+
+        const saved = data.example;
+        URL.revokeObjectURL(item.previewUrl);
+        if (!mountedRef.current) {
+          continue;
+        }
+        setExamples((current) => {
+          const next = current.map((example) =>
+            example.id === item.id
+              ? {
+                  id: saved.id,
+                  file: null,
+                  name: saved.name,
+                  previewUrl: saved.previewUrl,
+                }
+              : example,
+          );
+          examplesRef.current = next;
+          return next;
+        });
+        onSavedRef.current?.();
+      } catch (uploadError) {
+        URL.revokeObjectURL(item.previewUrl);
+        if (!mountedRef.current) {
+          continue;
+        }
+        setExamples((current) => {
+          const next = current.filter((example) => example.id !== item.id);
+          examplesRef.current = next;
+          return next;
+        });
+        setError(
+          uploadError instanceof Error
+            ? uploadError.message
+            : "Could not save example.",
+        );
+      } finally {
+        pendingUploadsRef.current = Math.max(0, pendingUploadsRef.current - 1);
+      }
+    }
   }
 
   function removeExample(id: string) {
+    const removed = examplesRef.current.find((example) => example.id === id);
     setExamples((current) => {
-      const removed = current.find((example) => example.id === id);
       if (removed?.previewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(removed.previewUrl);
       }
@@ -627,24 +722,29 @@ export function MemeGenerator({
       examplesRef.current = next;
       return next;
     });
-  }
 
-  async function appendExamples(formData: FormData) {
-    for (const example of examples) {
-      if (example.file) {
-        formData.append("examples", example.file);
-        continue;
-      }
-
-      const imageResponse = await fetch(example.previewUrl);
-      const blob = await imageResponse.blob();
-      formData.append(
-        "examples",
-        new File([blob], example.name, {
-          type: blob.type || "image/jpeg",
-        }),
-      );
+    const activeProjectId = projectIdRef.current;
+    if (!removed || !activeProjectId || isLocalExampleId(removed.id)) {
+      return;
     }
+
+    void fetch(`/api/projects/${activeProjectId}/examples/${removed.id}`, {
+      method: "DELETE",
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const data = (await response.json()) as { error?: string };
+          throw new Error(data.error || "Could not remove example.");
+        }
+        onSavedRef.current?.();
+      })
+      .catch((removeError: unknown) => {
+        setError(
+          removeError instanceof Error
+            ? removeError.message
+            : "Could not remove example.",
+        );
+      });
   }
 
   async function postGenerate(formData: FormData): Promise<{
@@ -686,6 +786,22 @@ export function MemeGenerator({
     formData.set("analysisModel", selectedAnalysisModelId);
   }
 
+  async function applyGeneratedResult(result: {
+    images: string[];
+    styleHint: string;
+  }, selectedIndexValue: number | null) {
+    const images = await compressResultDataUrls(result.images);
+    resultImagesRef.current = images;
+    styleHintRef.current = result.styleHint;
+    selectedIndexRef.current = selectedIndexValue;
+    updateTextRef.current = "";
+    setResultImages(images);
+    setStyleHint(result.styleHint);
+    setSelectedIndex(selectedIndexValue);
+    setUpdateText("");
+    await persist();
+  }
+
   async function handleGenerate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (generateDisabled) {
@@ -696,20 +812,12 @@ export function MemeGenerator({
     setError(null);
 
     try {
+      await waitForPendingUploads();
       const formData = new FormData();
       formData.set("prompt", prompt);
       appendExperimentFields(formData);
-      await appendExamples(formData);
       const result = await postGenerate(formData);
-      resultImagesRef.current = result.images;
-      styleHintRef.current = result.styleHint;
-      selectedIndexRef.current = null;
-      updateTextRef.current = "";
-      setResultImages(result.images);
-      setStyleHint(result.styleHint);
-      setSelectedIndex(null);
-      setUpdateText("");
-      await persist();
+      await applyGeneratedResult(result, null);
     } catch (generateError) {
       setError(
         generateError instanceof Error
@@ -735,24 +843,16 @@ export function MemeGenerator({
     setError(null);
 
     try {
+      await waitForPendingUploads();
       const formData = new FormData();
       formData.set("prompt", updateText.trim());
       appendExperimentFields(formData);
-      await appendExamples(formData);
       formData.set(
         "source",
         await dataUrlToFile(selectedResult, `meme-${selectedIndex + 1}.jpg`),
       );
       const result = await postGenerate(formData);
-      resultImagesRef.current = result.images;
-      styleHintRef.current = result.styleHint;
-      selectedIndexRef.current = 0;
-      updateTextRef.current = "";
-      setResultImages(result.images);
-      setStyleHint(result.styleHint);
-      setSelectedIndex(0);
-      setUpdateText("");
-      await persist();
+      await applyGeneratedResult(result, 0);
     } catch (modifyError) {
       setError(
         modifyError instanceof Error
@@ -869,9 +969,6 @@ export function MemeGenerator({
               <span className="font-display text-2xl tracking-wide text-accent">
                 Prompt
               </span>
-              <p className="mt-1 text-sm text-muted">
-                Describe the meme to generate from those examples.
-              </p>
             </label>
             <textarea
               id={promptId}

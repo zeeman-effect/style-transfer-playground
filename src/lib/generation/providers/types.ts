@@ -4,6 +4,7 @@ export type TextToImageInput = {
   prompt: string;
   count: number;
   modelId: string;
+  images?: File[];
 };
 
 export type ImageAndTextToImageInput = TextToImageInput & {

@@ -1,3 +1,7 @@
+import {
+  capProviderInputImages,
+  MAX_OPENAI_INPUT_IMAGES,
+} from "@/lib/images/constants";
 import type { GeneratedImage } from "../types";
 import { GenerationUpstreamError } from "../types";
 import type {
@@ -83,8 +87,20 @@ export class OpenAIModelProvider implements ModelProvider {
   constructor(private readonly apiKey: string) {}
 
   async textToImage(input: TextToImageInput): Promise<GeneratedImage[]> {
+    const images = capProviderInputImages(
+      MAX_OPENAI_INPUT_IMAGES,
+      undefined,
+      input.images,
+    );
+    if (images.length === 0) {
+      return this.generateImages(
+        (count) => this.requestGenerations(input.prompt, count, input.modelId),
+        input.count,
+      );
+    }
+
     return this.generateImages(
-      (count) => this.requestGenerations(input.prompt, count, input.modelId),
+      (count) => this.requestEdits(input.prompt, count, images, input.modelId),
       input.count,
     );
   }
@@ -92,9 +108,13 @@ export class OpenAIModelProvider implements ModelProvider {
   async imageAndTextToImage(
     input: ImageAndTextToImageInput,
   ): Promise<GeneratedImage[]> {
+    const images = capProviderInputImages(
+      MAX_OPENAI_INPUT_IMAGES,
+      input.image,
+      input.images,
+    );
     return this.generateImages(
-      (count) =>
-        this.requestEdits(input.prompt, count, input.image, input.modelId),
+      (count) => this.requestEdits(input.prompt, count, images, input.modelId),
       input.count,
     );
   }
@@ -175,12 +195,14 @@ export class OpenAIModelProvider implements ModelProvider {
   private async requestEdits(
     prompt: string,
     count: number,
-    sourceImage: File,
+    images: File[],
     modelId: string,
   ): Promise<GeneratedImage[]> {
     const body = new FormData();
     body.set("model", modelId);
-    body.set("image", sourceImage);
+    for (const image of images) {
+      body.append("image[]", image, image.name || "image.png");
+    }
     body.set("prompt", prompt);
     body.set("n", String(count));
     body.set("size", "1024x1024");

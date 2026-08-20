@@ -1,5 +1,7 @@
+import { loadProjectExampleFiles } from "@/lib/account/examples";
 import { loadDecryptedUserKeys } from "@/lib/account/keys";
 import {
+  getProject,
   ProjectNotFoundError,
   saveGenerationToProject,
 } from "@/lib/account/projects";
@@ -25,7 +27,8 @@ import {
   type GenerationRunLogger,
 } from "@/lib/logging";
 
-export const maxDuration = 120;
+// 24 is the timeout/cost cap for vision + image gen, not a Vercel body cap.
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   let run: GenerationRunLogger | undefined;
@@ -54,6 +57,7 @@ export async function POST(request: Request) {
     }
 
     const projectId = projectIdValue.trim();
+    activeRun.setProjectId(projectId);
 
     if (typeof promptValue !== "string" || promptValue.trim().length === 0) {
       return fail("Prompt is required.", 400);
@@ -103,9 +107,12 @@ export async function POST(request: Request) {
       }
     }
 
-    const examples = formData
-      .getAll("examples")
-      .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    await getProject(user.id, projectId);
+
+    const examples =
+      analyzerId === "noop"
+        ? []
+        : await loadProjectExampleFiles(user.id, projectId);
 
     const sourceValue = formData.get("source");
     const sourceImage =

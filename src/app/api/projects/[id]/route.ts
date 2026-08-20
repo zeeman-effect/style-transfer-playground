@@ -1,7 +1,6 @@
 import {
   deleteProject,
   getProject,
-  parseStoredExamples,
   parseStringArray,
   patchProject,
   ProjectNotFoundError,
@@ -101,14 +100,6 @@ export async function PATCH(
         return Response.json({ error: "Invalid images." }, { status: 400 });
       }
       patch.images = images;
-    }
-
-    if (body.examples !== undefined) {
-      const examples = parseStoredExamples(body.examples);
-      if (!examples) {
-        return Response.json({ error: "Invalid examples." }, { status: 400 });
-      }
-      patch.examples = examples;
     }
 
     if (body.selectedIndex !== undefined) {
