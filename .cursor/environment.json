@@ -1,0 +1,11 @@
+{
+  "name": "Meme Style Transfer",
+  "install": "npm ci && node .cursor/setup-env.mjs && npm run db:push",
+  "terminals": [
+    {
+      "name": "next-dev",
+      "command": "npm run dev"
+    }
+  ],
+  "ports": [3000]
+}
