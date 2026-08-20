@@ -12,6 +12,10 @@ const UNSIGNED_LAYOUT =
 const SIGNED_LAYOUT =
   "mx-auto flex w-full max-w-[88rem] flex-1 gap-6 px-6 py-8 sm:px-10";
 
+type PlaygroundProps = {
+  initialSignedIn?: boolean;
+};
+
 function setProjectQuery(router: ReturnType<typeof useRouter>, id: string) {
   const params = new URLSearchParams(window.location.search);
   if (params.get("project") === id) {
@@ -21,12 +25,16 @@ function setProjectQuery(router: ReturnType<typeof useRouter>, id: string) {
   router.replace(`/?${params.toString()}`, { scroll: false });
 }
 
-export function Playground() {
+export function Playground({ initialSignedIn = false }: PlaygroundProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedId = searchParams.get("project");
   const { data: session, isPending: sessionPending } = authClient.useSession();
-  const signedIn = Boolean(session?.user);
+  const [sessionReady, setSessionReady] = useState(false);
+  const signedIn =
+    sessionReady && !sessionPending
+      ? Boolean(session?.user)
+      : initialSignedIn;
 
   const generatorRef = useRef<MemeGeneratorHandle>(null);
   const activeIdRef = useRef<string | null>(null);
@@ -36,6 +44,10 @@ export function Playground() {
   const [snapshot, setSnapshot] = useState<ProjectRecord | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSessionReady(true);
+  }, []);
 
   const loadProject = useCallback(async (id: string) => {
     const response = await fetch(`/api/projects/${id}`);
@@ -71,7 +83,7 @@ export function Playground() {
   }, [signedIn]);
 
   useEffect(() => {
-    if (sessionPending || !signedIn) {
+    if (!sessionReady || sessionPending || !signedIn) {
       return;
     }
 
@@ -153,7 +165,7 @@ export function Playground() {
     return () => {
       cancelled = true;
     };
-  }, [applyActiveProject, loadProject, requestedId, sessionPending, signedIn]);
+  }, [applyActiveProject, loadProject, requestedId, sessionPending, sessionReady, signedIn]);
 
   async function flushCurrent() {
     await generatorRef.current?.flushSave();
@@ -296,7 +308,7 @@ export function Playground() {
     );
   }
 
-  if (sessionPending || !signedIn) {
+  if (!signedIn) {
     return (
       <div className={UNSIGNED_LAYOUT}>
         <MemeGenerator />

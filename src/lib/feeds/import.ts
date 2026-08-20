@@ -6,7 +6,7 @@ import { ExampleLimitError } from "@/lib/account/errors";
 import { getProject } from "@/lib/account/projects";
 import { downloadFeedImage } from "@/lib/feeds/download";
 import { FeedError } from "@/lib/feeds/errors";
-import { listInstagramFeedImages } from "@/lib/feeds/instagram";
+import { listInstagramImages } from "@/lib/feeds/instagram";
 import { parseFeedSource } from "@/lib/feeds/parse";
 import type { FeedPlatform } from "@/lib/feeds/types";
 import { listXFeedImages } from "@/lib/feeds/x";
@@ -22,7 +22,8 @@ export type ImportFeedInput = {
   source: string;
   platform: FeedPlatform;
   count?: number;
-  instagramCookie?: string;
+  instagramShortcodes?: string[];
+  instagramImageUrls?: string[];
 };
 
 export type ImportFeedResult = {
@@ -54,14 +55,17 @@ export async function importFeedExamples(
   }
   const take = Math.min(requested, remaining);
 
-  const refs =
-    parsed.platform === "instagram"
-      ? await listInstagramFeedImages(
-          parsed.username,
-          take,
-          input.instagramCookie ?? "",
-        )
-      : await listXFeedImages(parsed.username, take);
+  let refs;
+  if (parsed.platform === "instagram") {
+    const shortcodes = input.instagramShortcodes ?? [];
+    const imageUrls = input.instagramImageUrls ?? [];
+    if (shortcodes.length === 0 && imageUrls.length === 0) {
+      throw new FeedError("Instagram posts are required.", 400);
+    }
+    refs = listInstagramImages(parsed.username, shortcodes, imageUrls, take);
+  } else {
+    refs = await listXFeedImages(parsed.username, take);
+  }
 
   if (refs.length === 0) {
     throw new FeedError("No images found on that feed.", 400);
@@ -86,7 +90,10 @@ export async function importFeedExamples(
     if (lastError instanceof FeedError || lastError instanceof ExampleLimitError) {
       throw lastError;
     }
-    throw new FeedError("Could not download images from that feed.", 502);
+    throw new FeedError(
+      "Instagram images could not be downloaded. Wait a moment and try Pull again, or upload images instead.",
+      502,
+    );
   }
 
   return { examples };

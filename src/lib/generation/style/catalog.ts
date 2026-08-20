@@ -12,7 +12,7 @@ export const STYLE_ANALYZERS: AnalyzerCatalogEntry[] = [
     label: "Deep",
     requiresAnalysisModel: true,
     summary:
-      "A vision model describes each example, then writes one style paragraph added to the prompt. Needs an analysis model. Example images are not sent to the image model.",
+      "A vision model describes each example, then writes one style paragraph added to the prompt. Most expensive: one image-to-text call per example. Needs an analysis model. Example images are not sent to the image model.",
   },
   {
     id: "composite",

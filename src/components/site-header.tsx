@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -25,6 +26,11 @@ export function SiteHeader() {
 function SignedInSiteHeader() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
+  const [sessionReady, setSessionReady] = useState(false);
+
+  useEffect(() => {
+    setSessionReady(true);
+  }, []);
 
   async function handleSignOut() {
     await authClient.signOut();
@@ -41,7 +47,7 @@ function SignedInSiteHeader() {
           </h1>
         </Link>
         <nav className="flex flex-wrap items-center gap-3">
-          {isPending ? (
+          {!sessionReady || isPending ? (
             <span className="text-sm text-muted">Loading...</span>
           ) : session?.user ? (
             <>

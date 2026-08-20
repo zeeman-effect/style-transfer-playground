@@ -17,8 +17,29 @@ export default async function SettingsPage() {
         <h2 className="font-display text-2xl tracking-wide text-accent">
           API keys
         </h2>
+        <p className="mt-3 text-sm text-muted">
+          Each account stores its own keys, encrypted. Save a key for the
+          provider you generate with.{" "}
+          <a
+            href="https://aistudio.google.com/apikey"
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent underline-offset-2 hover:underline"
+          >
+            Google AI Studio
+          </a>
+          {" · "}
+          <a
+            href="https://platform.openai.com/api-keys"
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent underline-offset-2 hover:underline"
+          >
+            OpenAI
+          </a>
+        </p>
         <div className="mt-6">
-          <SettingsForm userId={session.user.id} saved={saved} />
+          <SettingsForm saved={saved} />
         </div>
       </section>
     </main>
