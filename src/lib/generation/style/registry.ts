@@ -2,48 +2,17 @@ import type { GenerationRunLogger } from "@/lib/logging";
 import { getAnalysisModelById } from "../analysis-models";
 import { createModelProvider } from "../providers";
 import type { WrapModelProvider } from "../providers/types";
-import type { AnalyzerCatalogEntry, ProviderKeys } from "../types";
+import type { ProviderKeys } from "../types";
 import { GenerationClientError } from "../types";
 import { DeepStyleAnalyzer } from "./analyzer";
 import type { StyleAnalyzer } from "./analyzer";
+import { getAnalyzerById } from "./catalog";
 import { CompositeAnalyzer } from "./composite-analyzer";
 import { CompositeReferenceAnalyzer } from "./composite-reference-analyzer";
 import { NoopStyleAnalyzer } from "./noop-analyzer";
 import { ReferenceStyleAnalyzer } from "./reference-analyzer";
 
-export const STYLE_ANALYZERS: AnalyzerCatalogEntry[] = [
-  {
-    id: "noop",
-    label: "No-op",
-    requiresAnalysisModel: false,
-  },
-  {
-    id: "deep",
-    label: "Deep",
-    requiresAnalysisModel: true,
-  },
-  {
-    id: "composite",
-    label: "Composite",
-    requiresAnalysisModel: true,
-  },
-  {
-    id: "reference",
-    label: "Reference",
-    requiresAnalysisModel: false,
-  },
-  {
-    id: "composite-reference",
-    label: "Composite-Reference",
-    requiresAnalysisModel: false,
-  },
-];
-
-export function getAnalyzerById(
-  analyzerId: string,
-): AnalyzerCatalogEntry | undefined {
-  return STYLE_ANALYZERS.find((analyzer) => analyzer.id === analyzerId);
-}
+export { STYLE_ANALYZERS, getAnalyzerById } from "./catalog";
 
 export function createStyleAnalyzer(
   analyzerId: string,

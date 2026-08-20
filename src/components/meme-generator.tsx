@@ -8,6 +8,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { AnalyzerHelp } from "@/components/analyzer-help";
+import { FeedImport } from "@/components/feed-import";
 import { ResultInspector } from "@/components/result-inspector";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -969,6 +971,30 @@ export function MemeGenerator({
             />
           </label>
 
+          <FeedImport
+            projectId={projectId}
+            remaining={MAX_PROJECT_EXAMPLES - examples.length}
+            disabled={requestInFlight}
+            onError={setError}
+            onImported={(saved) => {
+              setError(null);
+              setExamples((current) => {
+                const next = [
+                  ...current,
+                  ...saved.map((example) => ({
+                    id: example.id,
+                    file: null,
+                    name: example.name,
+                    previewUrl: example.previewUrl,
+                  })),
+                ];
+                examplesRef.current = next;
+                return next;
+              });
+              onSavedRef.current?.();
+            }}
+          />
+
           {examples.length > 0 && (
             <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {examples.map((example) => (
@@ -1076,10 +1102,16 @@ export function MemeGenerator({
                 </select>
               </label>
 
-              <label htmlFor={analyzerFieldId} className="block">
-                <span className="text-sm font-medium text-foreground">
-                  Analyzer
-                </span>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <label
+                    htmlFor={analyzerFieldId}
+                    className="text-sm font-medium text-foreground"
+                  >
+                    Analyzer
+                  </label>
+                  <AnalyzerHelp />
+                </div>
                 <select
                   id={analyzerFieldId}
                   name="analyzer"
@@ -1097,7 +1129,7 @@ export function MemeGenerator({
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
 
               <label htmlFor={analysisModelFieldId} className="block">
                 <span className="text-sm font-medium text-foreground">

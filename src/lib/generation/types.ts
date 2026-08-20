@@ -62,6 +62,7 @@ export type AnalyzerCatalogEntry = {
   id: string;
   label: string;
   requiresAnalysisModel: boolean;
+  summary: string;
 };
 
 export type GenerateMemeImagesInput = {
