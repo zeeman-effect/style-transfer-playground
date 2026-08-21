@@ -121,8 +121,8 @@ If you later attach a custom domain, add that origin and `https://<custom-domain
 ## 6. Smoke test
 
 1. Open the production URL. Enter `SITE_PASSWORD`, then sign in with Google.
-2. Settings: save a Google and/or OpenAI provider key.
-3. Create or open a project, upload example images, generate.
+2. Settings: save a Google Gemini and/or OpenAI provider key ([AI Studio](https://aistudio.google.com/apikey) / [OpenAI](https://platform.openai.com/api-keys)).
+3. Open a project, add example images (upload, or **Pull** from Instagram/X), write a prompt, generate. Instagram paste-in-console steps are in [README.md](./README.md#3-example-images).
 
 If sign-in fails with `redirect_uri_mismatch`, the callback URI in Google does not match `https://<host>/api/auth/callback/google` for the host in the address bar (including `www` vs not, and `BETTER_AUTH_URL`).
 

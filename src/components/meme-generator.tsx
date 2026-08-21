@@ -906,6 +906,24 @@ export function MemeGenerator({
     });
   }
 
+  const handleImported = useCallback((saved: StoredExample[]) => {
+    setError(null);
+    setExamples((current) => {
+      const next = [
+        ...current,
+        ...saved.map((example) => ({
+          id: example.id,
+          file: null,
+          name: example.name,
+          previewUrl: example.previewUrl,
+        })),
+      ];
+      examplesRef.current = next;
+      return next;
+    });
+    onSavedRef.current?.();
+  }, []);
+
   const layoutClass = selectedImage
     ? "grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]"
     : undefined;
@@ -976,23 +994,7 @@ export function MemeGenerator({
             remaining={MAX_PROJECT_EXAMPLES - examples.length}
             disabled={requestInFlight}
             onError={setError}
-            onImported={(saved) => {
-              setError(null);
-              setExamples((current) => {
-                const next = [
-                  ...current,
-                  ...saved.map((example) => ({
-                    id: example.id,
-                    file: null,
-                    name: example.name,
-                    previewUrl: example.previewUrl,
-                  })),
-                ];
-                examplesRef.current = next;
-                return next;
-              });
-              onSavedRef.current?.();
-            }}
+            onImported={handleImported}
           />
 
           {examples.length > 0 && (

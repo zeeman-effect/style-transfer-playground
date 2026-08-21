@@ -14,6 +14,10 @@ export default async function SignInPage() {
         <h2 className="font-display text-2xl tracking-wide text-accent">
           Sign in
         </h2>
+        <p className="mt-3 text-sm text-muted">
+          Continue with Google. After that, open Settings and save a Gemini or
+          OpenAI API key so you can generate.
+        </p>
         <div className="mt-6">
           <SignInButtons />
         </div>

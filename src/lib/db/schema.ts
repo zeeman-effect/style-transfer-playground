@@ -196,6 +196,37 @@ export const projectExample = sqliteTable(
   ],
 );
 
+/**
+ * Instagram blocks datacenter IPs, so the import runs in the user's browser.
+ * Instagram's CSP blocks posting to this origin, so a same-origin relay page
+ * receives the image URLs. That request has no session cookies from the
+ * Instagram tab, so a single-use token issued by Pull authorizes it, and the
+ * app tab polls the same row for the result.
+ */
+export const feedImportToken = sqliteTable(
+  "feed_import_token",
+  {
+    token: text("token").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull(),
+    source: text("source").notNull(),
+    count: integer("count").notNull(),
+    status: text("status").$type<"pending" | "done" | "error">().notNull(),
+    examples: text("examples_json", { mode: "json" }).$type<StoredExample[]>(),
+    error: text("error"),
+    claimedAt: integer("claimed_at", { mode: "timestamp_ms" }),
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("feed_import_token_userId_idx").on(table.userId),
+    index("feed_import_token_expiresAt_idx").on(table.expiresAt),
+  ],
+);
+
 export const generationRun = sqliteTable(
   "generation_run",
   {
