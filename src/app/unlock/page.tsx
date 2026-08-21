@@ -23,7 +23,7 @@ export default async function UnlockPage({
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 items-start px-6 py-8 sm:px-10">
-      <section className="w-full rounded-2xl border-2 border-panel-edge bg-panel p-5 shadow-[8px_8px_0_#0a0806]">
+      <section className="w-full rounded-xl border border-panel-edge bg-panel p-5">
         <h2 className="font-display text-2xl tracking-wide text-accent">
           Password
         </h2>
@@ -35,11 +35,11 @@ export default async function UnlockPage({
             required
             autoFocus
             autoComplete="current-password"
-            className="w-full rounded-xl border-2 border-panel-edge bg-background px-4 py-3 text-base text-foreground outline-none placeholder:text-muted/70 focus:border-accent"
+            className="w-full rounded-xl border border-panel-edge bg-background px-4 py-3 text-base text-foreground outline-none placeholder:text-muted/70 focus:border-accent"
           />
           <button
             type="submit"
-            className="w-full rounded-xl border-2 border-panel-edge bg-background px-5 py-3 font-display text-xl tracking-wide text-foreground transition-transform hover:-translate-y-0.5"
+            className="w-full rounded-xl border border-panel-edge bg-background px-5 py-3 font-display text-xl tracking-wide text-foreground transition-transform hover:-translate-y-0.5"
           >
             Continue
           </button>

@@ -9,7 +9,7 @@ const PROVIDERS: { id: ProviderId; label: string }[] = [
 ];
 
 const FIELD_CLASS =
-  "mt-2 w-full rounded-xl border-2 border-panel-edge bg-background px-4 py-3 text-base text-foreground outline-none placeholder:text-muted/70 focus:border-accent";
+  "mt-2 w-full rounded-xl border border-panel-edge bg-background px-4 py-3 text-base text-foreground outline-none placeholder:text-muted/70 focus:border-accent";
 
 type SettingsFormProps = {
   saved: Record<ProviderId, boolean>;
@@ -122,7 +122,7 @@ export function SettingsForm({ saved }: SettingsFormProps) {
                 type="button"
                 disabled={pending !== null}
                 onClick={() => void removeKey(provider.id)}
-                className="rounded-xl border-2 border-panel-edge px-5 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl border border-panel-edge px-5 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Remove
               </button>

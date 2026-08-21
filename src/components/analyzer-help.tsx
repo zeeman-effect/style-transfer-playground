@@ -22,14 +22,14 @@ export function AnalyzerHelp() {
         onClick={open}
         aria-haspopup="dialog"
         aria-label="How analyzers work"
-        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-panel-edge text-xs font-medium text-muted transition-colors hover:border-accent hover:text-accent"
+        className="inline-flex h-5 w-5 items-center justify-center rounded-xl border border-panel-edge text-xs font-medium text-muted transition-colors hover:border-accent hover:text-accent"
       >
         ?
       </button>
       <dialog
         ref={dialogRef}
         aria-labelledby={titleId}
-        className="m-auto w-[min(100%-2rem,24rem)] max-h-[min(28rem,calc(100vh-2rem))] overflow-y-auto rounded-2xl border-2 border-panel-edge bg-panel p-5 text-foreground shadow-[8px_8px_0_#0a0806] backdrop:bg-black/70"
+        className="m-auto w-[min(100%-2rem,24rem)] max-h-[min(28rem,calc(100vh-2rem))] overflow-y-auto rounded-xl border border-panel-edge bg-panel p-5 text-foreground backdrop:bg-background/80"
         onClick={(event) => {
           if (event.target === event.currentTarget) {
             close();
@@ -47,7 +47,7 @@ export function AnalyzerHelp() {
             type="button"
             onClick={close}
             aria-label="Close"
-            className="rounded-full border border-panel-edge bg-black/80 px-2 py-1 text-xs uppercase tracking-wide text-accent"
+            className="rounded-xl border border-panel-edge bg-background/80 px-2 py-1 text-xs uppercase tracking-wide text-accent"
           >
             X
           </button>
