@@ -11,7 +11,6 @@ import {
 import { AnalyzerHelp } from "@/components/analyzer-help";
 import { FeedImport } from "@/components/feed-import";
 import { ResultInspector } from "@/components/result-inspector";
-import { AccountControls } from "@/components/site-header";
 import { authClient } from "@/lib/auth-client";
 import {
   compressImageFile,
@@ -927,19 +926,17 @@ export function MemeGenerator({
     onSavedRef.current?.();
   }, []);
 
+  const layoutClass = selectedImage
+    ? "grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]"
+    : undefined;
+  const formClass = selectedImage
+    ? "grid gap-6 lg:col-span-2 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]"
+    : "grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]";
+
   return (
-    <form
-      onSubmit={handleGenerate}
-      className={
-        selectedImage
-          ? "grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] lg:items-start"
-          : "grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_auto] lg:items-start"
-      }
-    >
-        <div className="flex justify-end lg:col-start-3 lg:row-start-1">
-          <AccountControls />
-        </div>
-        <section className="rounded-xl border border-panel-edge bg-panel p-5 lg:col-start-1 lg:row-start-1">
+    <div className={layoutClass}>
+      <form onSubmit={handleGenerate} className={formClass}>
+        <section className="rounded-xl border border-panel-edge bg-panel p-5">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <h2 className="font-display text-2xl tracking-wide text-accent">
@@ -1028,7 +1025,8 @@ export function MemeGenerator({
           )}
         </section>
 
-        <section className="rounded-xl border border-panel-edge bg-panel p-5 lg:col-start-2 lg:row-start-1">
+        <div className="flex flex-col gap-6">
+          <section className="rounded-xl border border-panel-edge bg-panel p-5">
             <label htmlFor={promptId} className="block">
               <span className="font-display text-2xl tracking-wide text-accent">
                 Prompt
@@ -1218,11 +1216,7 @@ export function MemeGenerator({
             </button>
           </section>
 
-          <section
-            className={`rounded-xl border border-panel-edge bg-panel p-5 lg:col-start-1 lg:row-start-2 ${
-              selectedImage ? "lg:col-span-2" : "lg:col-span-3"
-            }`}
-          >
+          <section className="flex-1 rounded-xl border border-panel-edge bg-panel p-5">
             <h2 className="font-display text-2xl tracking-wide text-accent">
               Result
             </h2>
@@ -1269,9 +1263,10 @@ export function MemeGenerator({
               )}
             </div>
           </section>
+        </div>
+      </form>
 
       {selectedImage && selectedIndex !== null && (
-        <div className="lg:col-start-3 lg:row-start-2">
         <ResultInspector
           image={selectedImage}
           index={selectedIndex}
@@ -1287,8 +1282,7 @@ export function MemeGenerator({
           isModifying={isModifying}
           modifyDisabled={modifyDisabled}
         />
-        </div>
       )}
-    </form>
+    </div>
   );
 }

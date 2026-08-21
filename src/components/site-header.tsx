@@ -1,35 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+
+const subscribeHydrated = () => () => {};
 
 const buttonClass =
   "rounded-xl border border-panel-edge bg-panel px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-accent/70";
 
 export function SiteHeader() {
   const pathname = usePathname();
-  if (pathname === "/unlock" || pathname === "/") {
-    return null;
-  }
+  const isUnlock = pathname === "/unlock";
 
   return (
-    <div className="flex justify-end px-6 pt-6 sm:px-10">
-      <AccountControls />
-    </div>
+    <header
+      className={
+        isUnlock ? undefined : "flex justify-end px-6 pt-6 sm:px-10"
+      }
+    >
+      <h1 className="sr-only">Style Transfer Playground</h1>
+      {isUnlock ? null : <AccountControls />}
+    </header>
   );
 }
 
-export function AccountControls() {
+function AccountControls() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
-  const [sessionReady, setSessionReady] = useState(false);
-
-  useEffect(() => {
-    setSessionReady(true);
-  }, []);
+  const sessionReady = useSyncExternalStore(
+    subscribeHydrated,
+    () => true,
+    () => false,
+  );
 
   async function handleSignOut() {
     await authClient.signOut();
