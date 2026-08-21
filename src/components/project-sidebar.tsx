@@ -36,7 +36,7 @@ export function ProjectSidebar({
 
   return (
     <aside className="w-64 shrink-0">
-      <div className="sticky top-6 rounded-2xl border-2 border-panel-edge bg-panel p-4 shadow-[8px_8px_0_#0a0806]">
+      <div className="sticky top-6 rounded-xl border border-panel-edge bg-panel p-4">
         <div className="mb-4 flex items-center justify-between gap-2">
           <h2 className="font-display text-2xl tracking-wide text-accent">
             Projects
@@ -45,7 +45,7 @@ export function ProjectSidebar({
             type="button"
             disabled={disabled}
             onClick={onCreate}
-            className="rounded-xl border-2 border-panel-edge bg-background px-3 py-1 text-sm font-medium text-foreground transition-colors hover:border-accent/70 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl border border-panel-edge bg-background px-3 py-1 text-sm font-medium text-foreground transition-colors hover:border-accent/70 disabled:cursor-not-allowed disabled:opacity-60"
           >
             New
           </button>
@@ -56,7 +56,7 @@ export function ProjectSidebar({
             return (
               <li key={entry.id}>
                 <div
-                  className={`flex items-center gap-2 rounded-xl border-2 px-2 py-2 ${
+                  className={`flex items-center gap-2 rounded-xl border px-2 py-2 ${
                     selected
                       ? "border-accent bg-accent/10"
                       : "border-panel-edge bg-background"

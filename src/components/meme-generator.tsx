@@ -62,7 +62,9 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
 };
 
 const SELECT_CLASS =
-  "mt-2 w-full rounded-xl border-2 border-panel-edge bg-background px-4 py-3 text-base text-foreground outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full rounded-xl border border-panel-edge bg-background px-4 py-3 text-base text-foreground outline-none focus:border-accent disabled:cursor-not-allowed disabled:opacity-60";
+
+const FIELD_CLASS = "grid gap-2 sm:row-span-2 sm:grid-rows-subgrid";
 
 const SAVE_DEBOUNCE_MS = 1000;
 
@@ -934,14 +936,14 @@ export function MemeGenerator({
   return (
     <div className={layoutClass}>
       <form onSubmit={handleGenerate} className={formClass}>
-        <section className="rounded-2xl border-2 border-panel-edge bg-panel p-5 shadow-[8px_8px_0_#0a0806]">
+        <section className="rounded-xl border border-panel-edge bg-panel p-5">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <h2 className="font-display text-2xl tracking-wide text-accent">
                 Example images
               </h2>
             </div>
-            <span className="rounded-full border border-panel-edge px-3 py-1 text-xs uppercase tracking-widest text-muted">
+            <span className="rounded-xl border border-panel-edge px-3 py-1 text-xs uppercase tracking-widest text-muted">
               {examples.length} added
             </span>
           </div>
@@ -960,10 +962,10 @@ export function MemeGenerator({
                 addFiles(event.dataTransfer.files);
               }
             }}
-            className={`flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors ${
+            className={`flex min-h-48 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-10 text-center transition-colors ${
               isDragging
                 ? "border-accent bg-accent/10"
-                : "border-panel-edge hover:border-accent/70 hover:bg-white/5"
+                : "border-panel-edge hover:border-accent/70 hover:bg-accent/5"
             }`}
           >
             <span className="font-display text-xl tracking-wide">
@@ -1002,7 +1004,7 @@ export function MemeGenerator({
               {examples.map((example) => (
                 <li
                   key={example.id}
-                  className="group relative overflow-hidden rounded-lg border-2 border-panel-edge bg-black"
+                  className="group relative overflow-hidden rounded-lg border border-panel-edge bg-background"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -1013,7 +1015,7 @@ export function MemeGenerator({
                   <button
                     type="button"
                     onClick={() => removeExample(example.id)}
-                    className="absolute right-2 top-2 rounded-full bg-black/80 px-2 py-1 text-xs uppercase tracking-wide text-accent opacity-0 transition-opacity group-hover:opacity-100"
+                    className="absolute right-2 top-2 rounded-xl bg-background/80 px-2 py-1 text-xs uppercase tracking-wide text-accent opacity-0 transition-opacity group-hover:opacity-100"
                   >
                     Remove
                   </button>
@@ -1024,7 +1026,7 @@ export function MemeGenerator({
         </section>
 
         <div className="flex flex-col gap-6">
-          <section className="rounded-2xl border-2 border-panel-edge bg-panel p-5 shadow-[8px_8px_0_#0a0806]">
+          <section className="rounded-xl border border-panel-edge bg-panel p-5">
             <label htmlFor={promptId} className="block">
               <span className="font-display text-2xl tracking-wide text-accent">
                 Prompt
@@ -1040,12 +1042,12 @@ export function MemeGenerator({
               }}
               rows={7}
               placeholder="A confused dog at a whiteboard, same grainy caption style as the examples..."
-              className="mt-4 w-full resize-y rounded-xl border-2 border-panel-edge bg-background px-4 py-3 text-base leading-6 text-foreground outline-none placeholder:text-muted/70 focus:border-accent"
+              className="mt-4 w-full resize-y rounded-xl border border-panel-edge bg-background px-4 py-3 text-base leading-6 text-foreground outline-none placeholder:text-muted/70 focus:border-accent"
             />
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label htmlFor={providerFieldId} className="block">
-                <span className="text-sm font-medium text-foreground">
+            <div className="mt-4 grid gap-x-3 gap-y-3 sm:grid-cols-2">
+              <label htmlFor={providerFieldId} className={FIELD_CLASS}>
+                <span className="self-end text-sm font-medium leading-5 text-foreground">
                   Provider
                 </span>
                 <select
@@ -1081,8 +1083,8 @@ export function MemeGenerator({
                 </select>
               </label>
 
-              <label htmlFor={imageModelId} className="block">
-                <span className="text-sm font-medium text-foreground">
+              <label htmlFor={imageModelId} className={FIELD_CLASS}>
+                <span className="self-end text-sm font-medium leading-5 text-foreground">
                   Image model
                 </span>
                 <select
@@ -1104,11 +1106,11 @@ export function MemeGenerator({
                 </select>
               </label>
 
-              <div>
-                <div className="flex items-center gap-1.5">
+              <div className={FIELD_CLASS}>
+                <div className="flex items-center gap-1.5 self-end">
                   <label
                     htmlFor={analyzerFieldId}
-                    className="text-sm font-medium text-foreground"
+                    className="text-sm font-medium leading-5 text-foreground"
                   >
                     Analyzer
                   </label>
@@ -1133,8 +1135,8 @@ export function MemeGenerator({
                 </select>
               </div>
 
-              <label htmlFor={analysisModelFieldId} className="block">
-                <span className="text-sm font-medium text-foreground">
+              <label htmlFor={analysisModelFieldId} className={FIELD_CLASS}>
+                <span className="self-end text-sm font-medium leading-5 text-foreground">
                   Analysis model
                 </span>
                 <select
@@ -1170,8 +1172,8 @@ export function MemeGenerator({
                 </select>
               </label>
 
-              <label htmlFor={imageCountFieldId} className="block">
-                <span className="text-sm font-medium text-foreground">
+              <label htmlFor={imageCountFieldId} className={FIELD_CLASS}>
+                <span className="self-end text-sm font-medium leading-5 text-foreground">
                   Images
                 </span>
                 <input
@@ -1204,7 +1206,7 @@ export function MemeGenerator({
             <button
               type="submit"
               disabled={generateDisabled}
-              className="mt-4 w-full rounded-xl bg-accent px-5 py-3 font-display text-xl tracking-wide text-accent-ink transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-4 w-full rounded-xl bg-accent px-5 py-3 font-display text-xl tracking-wide text-accent-ink shadow-glow transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
             >
               {isModifying
                 ? "Modifying..."
@@ -1214,14 +1216,14 @@ export function MemeGenerator({
             </button>
           </section>
 
-          <section className="flex-1 rounded-2xl border-2 border-panel-edge bg-panel p-5 shadow-[8px_8px_0_#0a0806]">
+          <section className="flex-1 rounded-xl border border-panel-edge bg-panel p-5">
             <h2 className="font-display text-2xl tracking-wide text-accent">
               Result
             </h2>
             <p className="mt-1 text-sm text-muted">
               Generated images will show up here.
             </p>
-            <div className="mt-4 min-h-32 rounded-xl border-2 border-dashed border-panel-edge bg-background px-4 py-6">
+            <div className="mt-4 min-h-32 rounded-xl border border-dashed border-panel-edge bg-background px-4 py-6">
               {error ? (
                 <p className="text-sm text-red-300">{error}</p>
               ) : null}
@@ -1237,9 +1239,9 @@ export function MemeGenerator({
                           type="button"
                           aria-pressed={selected}
                           onClick={() => toggleResult(index)}
-                          className={`w-full overflow-hidden rounded-lg border-2 bg-black ${
+                          className={`w-full overflow-hidden rounded-lg border bg-background ${
                             selected
-                              ? "border-accent ring-2 ring-accent"
+                              ? "border-accent ring-1 ring-accent/60"
                               : "border-panel-edge"
                           }`}
                         >

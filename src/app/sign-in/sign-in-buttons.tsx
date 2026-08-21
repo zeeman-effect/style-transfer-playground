@@ -31,7 +31,7 @@ export function SignInButtons() {
         type="button"
         disabled={pending}
         onClick={() => void signIn()}
-        className="w-full rounded-xl border-2 border-panel-edge bg-background px-5 py-3 font-display text-xl tracking-wide text-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-xl border border-panel-edge bg-background px-5 py-3 font-display text-xl tracking-wide text-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? "Redirecting..." : "Continue with Google"}
       </button>

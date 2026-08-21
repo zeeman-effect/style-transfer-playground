@@ -1,13 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #14110d;
-  --foreground: #f4efe4;
-  --panel: #1f1a14;
-  --panel-edge: #3a3228;
-  --accent: #f5d547;
-  --accent-ink: #1a1408;
-  --muted: #b8ab98;
+  --background: #0a0010;
+  --foreground: #f6eef4;
+  --panel: #140814;
+  --panel-edge: #5a2a40;
+  --accent: #ff71ce;
+  --accent-ink: #0a0010;
+  --muted: #b89aa8;
+  --ui-radius: 0px;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -19,8 +21,18 @@
   --color-accent-ink: var(--accent-ink);
   --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
-  --font-display: var(--font-anton);
+  --font-display: var(--font-oswald);
   --font-mono: var(--font-geist-mono);
+  --shadow-glow: 0 0 28px color-mix(in srgb, var(--accent) 30%, transparent);
+  --radius: var(--ui-radius);
+  --radius-xs: var(--ui-radius);
+  --radius-sm: var(--ui-radius);
+  --radius-md: var(--ui-radius);
+  --radius-lg: var(--ui-radius);
+  --radius-xl: var(--ui-radius);
+  --radius-2xl: var(--ui-radius);
+  --radius-3xl: var(--ui-radius);
+  --radius-4xl: var(--ui-radius);
 }
 
 body {

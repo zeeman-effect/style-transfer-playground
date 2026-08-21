@@ -20,7 +20,7 @@ import {
 } from "@/lib/images/constants";
 
 const FIELD_CLASS =
-  "rounded-xl border-2 border-panel-edge bg-background px-4 py-3 text-base text-foreground outline-none placeholder:text-muted/70 focus:border-accent disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-xl border border-panel-edge bg-background px-4 py-3 text-base text-foreground outline-none placeholder:text-muted/70 focus:border-accent disabled:cursor-not-allowed disabled:opacity-60";
 
 type FeedImportProps = {
   projectId?: string;
@@ -405,7 +405,7 @@ export function FeedImport({
               href={assist.profileUrl}
               target={IG_WINDOW_NAME}
               rel="opener"
-              className="rounded-xl border-2 border-panel-edge px-4 py-2 text-sm font-medium"
+              className="rounded-xl border border-panel-edge px-4 py-2 text-sm font-medium"
             >
               Open profile
             </a>
@@ -420,7 +420,7 @@ export function FeedImport({
               href={assist.bookmarklet}
               title="Drag to the bookmarks bar"
               onClick={(event) => event.preventDefault()}
-              className="rounded-xl border-2 border-panel-edge px-4 py-2 text-sm font-medium"
+              className="rounded-xl border border-panel-edge px-4 py-2 text-sm font-medium"
             >
               Bookmarklet
             </a>
@@ -436,7 +436,7 @@ export function FeedImport({
                   { method: "DELETE" },
                 ).catch(() => {});
               }}
-              className="rounded-xl border-2 border-panel-edge px-4 py-2 text-sm font-medium"
+              className="rounded-xl border border-panel-edge px-4 py-2 text-sm font-medium"
             >
               Cancel
             </button>

@@ -45,19 +45,19 @@ export function ResultInspector({
   }, [onClose]);
 
   return (
-    <section className="rounded-2xl border-2 border-panel-edge bg-panel p-5 shadow-[8px_8px_0_#0a0806]">
+    <section className="rounded-xl border border-panel-edge bg-panel p-5">
       <div className="mb-4 flex items-start justify-end">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="rounded-full border border-panel-edge bg-black/80 px-2 py-1 text-xs uppercase tracking-wide text-accent"
+          className="rounded-xl border border-panel-edge bg-background/80 px-2 py-1 text-xs uppercase tracking-wide text-accent"
         >
           X
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border-2 border-panel-edge bg-black">
+      <div className="overflow-hidden rounded-lg border border-panel-edge bg-background">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image}
@@ -70,14 +70,14 @@ export function ResultInspector({
         <a
           href={image}
           download={filename}
-          className="rounded-xl border-2 border-panel-edge px-5 py-3 text-center font-display text-xl tracking-wide text-accent transition-transform hover:-translate-y-0.5"
+          className="rounded-xl border border-panel-edge px-5 py-3 text-center font-display text-xl tracking-wide text-accent transition-transform hover:-translate-y-0.5"
         >
           Download
         </a>
         <button
           type="button"
           onClick={handleShare}
-          className="rounded-xl border-2 border-panel-edge px-5 py-3 font-display text-xl tracking-wide text-accent transition-transform hover:-translate-y-0.5"
+          className="rounded-xl border border-panel-edge px-5 py-3 font-display text-xl tracking-wide text-accent transition-transform hover:-translate-y-0.5"
         >
           Share
         </button>
@@ -92,7 +92,7 @@ export function ResultInspector({
           rows={3}
           wrap="soft"
           placeholder="Update image..."
-          className="mt-0 w-full resize-y rounded-xl border-2 border-panel-edge bg-background px-4 py-3 text-base leading-6 text-foreground outline-none placeholder:text-muted/70 focus:border-accent"
+          className="mt-0 w-full resize-y rounded-xl border border-panel-edge bg-background px-4 py-3 text-base leading-6 text-foreground outline-none placeholder:text-muted/70 focus:border-accent"
         />
       </label>
 
@@ -100,7 +100,7 @@ export function ResultInspector({
         type="button"
         onClick={onModify}
         disabled={modifyDisabled}
-        className="mt-4 w-full rounded-xl bg-accent px-5 py-3 font-display text-xl tracking-wide text-accent-ink transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-4 w-full rounded-xl bg-accent px-5 py-3 font-display text-xl tracking-wide text-accent-ink shadow-glow transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
       >
         {isModifying ? "Modifying..." : "Modify Image"}
       </button>
