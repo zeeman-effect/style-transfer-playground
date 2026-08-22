@@ -1,7 +1,6 @@
 import {
   deleteProject,
   getProject,
-  parseStringArray,
   patchProject,
   ProjectNotFoundError,
   type ProjectPatch,
@@ -94,12 +93,17 @@ export async function PATCH(
       patch.styleHint = body.styleHint;
     }
 
-    if (body.images !== undefined) {
-      const images = parseStringArray(body.images);
-      if (!images) {
-        return Response.json({ error: "Invalid images." }, { status: 400 });
+    if (body.selectedGenerationId !== undefined) {
+      if (
+        body.selectedGenerationId !== null &&
+        typeof body.selectedGenerationId !== "string"
+      ) {
+        return Response.json(
+          { error: "Invalid selected generation." },
+          { status: 400 },
+        );
       }
-      patch.images = images;
+      patch.selectedGenerationId = body.selectedGenerationId;
     }
 
     if (body.selectedIndex !== undefined) {

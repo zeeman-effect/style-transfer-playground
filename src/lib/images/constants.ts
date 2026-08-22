@@ -1,6 +1,9 @@
 /** Soft cap for stored examples: timeout/cost, not a Vercel body limit. */
 export const MAX_PROJECT_EXAMPLES = 24;
 
+/** Soft cap for stored generation batches. Nothing is auto-deleted. */
+export const MAX_PROJECT_GENERATIONS = 24;
+
 /** Gemini image-generation input cap (source counts toward the total). */
 export const MAX_GOOGLE_INPUT_IMAGES = 14;
 

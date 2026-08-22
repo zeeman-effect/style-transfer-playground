@@ -1,16 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MemeGenerator, type MemeGeneratorHandle } from "@/components/meme-generator";
-import { ProjectSidebar } from "@/components/project-sidebar";
+import {
+  useRegisterProjectChrome,
+  type ProjectChrome,
+} from "@/components/project-chrome";
 import { authClient } from "@/lib/auth-client";
 import type { ProjectRecord, ProjectSummary } from "@/lib/generation/types";
 
-const UNSIGNED_LAYOUT =
-  "mx-auto w-full max-w-7xl flex-1 px-6 py-8 sm:px-10";
-const SIGNED_LAYOUT =
-  "mx-auto flex w-full max-w-[88rem] flex-1 gap-6 px-6 py-8 sm:px-10";
+const LAYOUT =
+  "mx-auto w-full max-w-[88rem] flex-1 px-6 py-8 sm:px-10";
 
 type PlaygroundProps = {
   initialSignedIn?: boolean;
@@ -308,49 +309,55 @@ export function Playground({ initialSignedIn = false }: PlaygroundProps) {
     );
   }
 
+  const projectChrome = useMemo<ProjectChrome | null>(() => {
+    if (!signedIn) {
+      return null;
+    }
+    return {
+      projects,
+      selectedId: activeId,
+      disabled: busy,
+      onSelect: (id) => {
+        void selectProject(id);
+      },
+      onCreate: () => {
+        void createProject();
+      },
+      onRename: (id, name) => {
+        void renameProject(id, name);
+      },
+      onDelete: (id) => {
+        void deleteProject(id);
+      },
+    };
+  }, [signedIn, projects, activeId, busy]);
+
+  useRegisterProjectChrome(projectChrome);
+
   if (!signedIn) {
     return (
-      <div className={UNSIGNED_LAYOUT}>
+      <div className={LAYOUT}>
         <MemeGenerator />
       </div>
     );
   }
 
   return (
-    <div className={SIGNED_LAYOUT}>
-      <ProjectSidebar
-        projects={projects}
-        selectedId={activeId}
-        disabled={busy}
-        onSelect={(id) => {
-          void selectProject(id);
-        }}
-        onCreate={() => {
-          void createProject();
-        }}
-        onRename={(id, name) => {
-          void renameProject(id, name);
-        }}
-        onDelete={(id) => {
-          void deleteProject(id);
-        }}
-      />
-      <div className="min-w-0 flex-1">
-        {error ? (
-          <p className="mb-4 text-sm text-red-300" role="status">
-            {error}
-          </p>
-        ) : null}
-        {snapshot && activeId ? (
-          <MemeGenerator
-            key={activeId}
-            ref={generatorRef}
-            projectId={activeId}
-            initialSnapshot={snapshot}
-            onSaved={handleSaved}
-          />
-        ) : null}
-      </div>
+    <div className={LAYOUT}>
+      {error ? (
+        <p className="mb-4 text-sm text-red-300" role="status">
+          {error}
+        </p>
+      ) : null}
+      {snapshot && activeId ? (
+        <MemeGenerator
+          key={activeId}
+          ref={generatorRef}
+          projectId={activeId}
+          initialSnapshot={snapshot}
+          onSaved={handleSaved}
+        />
+      ) : null}
     </div>
   );
 }

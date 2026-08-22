@@ -7,10 +7,19 @@ import {
 } from "@/lib/account/examples";
 import { ProjectNotFoundError } from "@/lib/account/errors";
 import { getUserGeneration } from "@/lib/account/generation";
+import {
+  backfillLegacyGeneration,
+  countProjectGenerations,
+  createProjectGeneration,
+  deleteProjectGenerations,
+  listProjectGenerations,
+  parseDataUrl,
+} from "@/lib/account/generations";
 import { db } from "@/lib/db";
 import { project } from "@/lib/db/schema";
 import { MAX_PROJECT_EXAMPLES } from "@/lib/images/constants";
 import type {
+  ProjectGeneration,
   ProjectRecord,
   ProjectSnapshot,
   ProjectSummary,
@@ -24,7 +33,9 @@ export type ProjectListResult = {
   lastOpenedId: string;
 };
 
-export type ProjectPatch = Partial<Omit<ProjectSnapshot, "examples">> & {
+export type ProjectPatch = Partial<
+  Omit<ProjectSnapshot, "examples" | "generations">
+> & {
   name?: string;
   opened?: boolean;
 };
@@ -37,8 +48,9 @@ const EMPTY_SNAPSHOT: ProjectSnapshot = {
   analyzerId: "noop",
   analysisModelId: null,
   styleHint: "",
-  images: [],
+  generations: [],
   examples: [],
+  selectedGenerationId: null,
   selectedIndex: null,
   updateText: "",
 };
@@ -55,7 +67,11 @@ function toSummary(row: {
   };
 }
 
-function toRecord(row: ProjectRow, examples: StoredExample[]): ProjectRecord {
+function toRecord(
+  row: ProjectRow,
+  examples: StoredExample[],
+  generations: ProjectGeneration[],
+): ProjectRecord {
   return {
     id: row.id,
     name: row.name,
@@ -64,24 +80,14 @@ function toRecord(row: ProjectRow, examples: StoredExample[]): ProjectRecord {
     analyzerId: row.analyzerId,
     analysisModelId: row.analysisModelId,
     styleHint: row.styleHint,
-    images: row.images,
+    generations,
     examples,
+    selectedGenerationId: row.selectedGenerationId,
     selectedIndex: row.selectedIndex,
     updateText: row.updateText,
     createdAt: row.createdAt.getTime(),
     updatedAt: row.updatedAt.getTime(),
     lastOpenedAt: row.lastOpenedAt.getTime(),
-  };
-}
-
-function parseDataUrl(dataUrl: string): { mimeType: string; bytes: Buffer } | null {
-  const match = /^data:([^;,]+);base64,([\s\S]+)$/.exec(dataUrl);
-  if (!match || !match[1] || !match[2]) {
-    return null;
-  }
-  return {
-    mimeType: match[1],
-    bytes: Buffer.from(match[2], "base64"),
   };
 }
 
@@ -112,6 +118,32 @@ async function migrateLegacyExamples(row: ProjectRow): Promise<void> {
   await db
     .update(project)
     .set({ examples: [] })
+    .where(eq(project.id, row.id));
+}
+
+async function migrateLegacyGenerations(row: ProjectRow): Promise<void> {
+  if (!Array.isArray(row.images) || row.images.length === 0) {
+    return;
+  }
+
+  const existing = await countProjectGenerations(row.userId, row.id);
+  if (existing === 0) {
+    const stored = await backfillLegacyGeneration(row.userId, row.id, {
+      prompt: row.prompt,
+      modelId: row.modelId,
+      analyzerId: row.analyzerId,
+      analysisModelId: row.analysisModelId,
+      styleHint: row.styleHint,
+      images: row.images,
+    });
+    if (!stored && row.images.some((image) => parseDataUrl(image))) {
+      return;
+    }
+  }
+
+  await db
+    .update(project)
+    .set({ images: [] })
     .where(eq(project.id, row.id));
 }
 
@@ -174,8 +206,9 @@ async function insertProject(
     analyzerId: snapshot.analyzerId,
     analysisModelId: snapshot.analysisModelId,
     styleHint: snapshot.styleHint,
-    images: snapshot.images,
+    images: [],
     examples: [],
+    selectedGenerationId: snapshot.selectedGenerationId,
     selectedIndex: snapshot.selectedIndex,
     updateText: snapshot.updateText,
     createdAt: now,
@@ -205,8 +238,15 @@ async function getOwnedProject(
   }
 
   await migrateLegacyExamples(row);
+  await migrateLegacyGenerations(row);
   const examples = await listProjectExampleMeta(userId, projectId);
-  return toRecord(row, examples);
+  const generations = await listProjectGenerations(userId, projectId);
+  const [fresh] = await db
+    .select()
+    .from(project)
+    .where(and(eq(project.id, projectId), eq(project.userId, userId)))
+    .limit(1);
+  return toRecord(fresh ?? row, examples, generations);
 }
 
 export async function listProjects(userId: string): Promise<ProjectListResult> {
@@ -215,17 +255,28 @@ export async function listProjects(userId: string): Promise<ProjectListResult> {
   if (rows.length === 0) {
     const generation = await getUserGeneration(userId);
     if (generation) {
-      await insertProject(userId, "Untitled", {
+      const created = await insertProject(userId, "Untitled", {
         prompt: generation.prompt,
         modelId: generation.modelId,
         analyzerId: generation.analyzerId,
         analysisModelId: generation.analysisModelId ?? null,
         styleHint: generation.styleHint,
-        images: generation.images,
+        generations: [],
         examples: [],
+        selectedGenerationId: null,
         selectedIndex: null,
         updateText: "",
       });
+      if (generation.images.length > 0) {
+        await createProjectGeneration(userId, created.id, {
+          prompt: generation.prompt,
+          modelId: generation.modelId,
+          analyzerId: generation.analyzerId,
+          analysisModelId: generation.analysisModelId ?? null,
+          styleHint: generation.styleHint,
+          images: generation.images,
+        });
+      }
     } else {
       await insertProject(userId, "Untitled", EMPTY_SNAPSHOT);
     }
@@ -291,8 +342,8 @@ export async function patchProject(
   if (typeof patch.styleHint === "string") {
     updates.styleHint = patch.styleHint;
   }
-  if (patch.images !== undefined) {
-    updates.images = patch.images;
+  if (patch.selectedGenerationId !== undefined) {
+    updates.selectedGenerationId = patch.selectedGenerationId;
   }
   if (patch.selectedIndex !== undefined) {
     updates.selectedIndex = patch.selectedIndex;
@@ -333,16 +384,30 @@ export async function saveGenerationToProject(
     analysisModelId?: string;
     styleHint: string;
     images: string[];
+    parentGenerationId?: string | null;
   },
-): Promise<void> {
+): Promise<ProjectGeneration> {
   await patchProject(userId, projectId, {
     prompt: record.prompt,
     modelId: record.modelId,
     analyzerId: record.analyzerId,
     analysisModelId: record.analysisModelId ?? null,
     styleHint: record.styleHint,
+  });
+
+  const generation = await createProjectGeneration(userId, projectId, {
+    prompt: record.prompt,
+    modelId: record.modelId,
+    analyzerId: record.analyzerId,
+    analysisModelId: record.analysisModelId ?? null,
+    styleHint: record.styleHint,
+    parentGenerationId: record.parentGenerationId,
     images: record.images,
   });
+  if (!generation) {
+    throw new Error("No images were returned.");
+  }
+  return generation;
 }
 
 export async function deleteProject(
@@ -355,6 +420,7 @@ export async function deleteProject(
   }
 
   await deleteProjectExamples(userId, projectId);
+  await deleteProjectGenerations(userId, projectId);
   await db
     .delete(project)
     .where(and(eq(project.id, projectId), eq(project.userId, userId)));
@@ -408,11 +474,4 @@ export function parseStoredExamples(value: unknown): StoredExample[] | null {
     });
   }
   return examples;
-}
-
-export function parseStringArray(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
-    return null;
-  }
-  return value;
 }

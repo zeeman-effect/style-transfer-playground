@@ -1,4 +1,9 @@
 import { loadProjectExampleFiles } from "@/lib/account/examples";
+import {
+  countProjectGenerations,
+  GenerationLimitError,
+  GenerationNotFoundError,
+} from "@/lib/account/generations";
 import { loadDecryptedUserKeys } from "@/lib/account/keys";
 import {
   getProject,
@@ -23,6 +28,7 @@ import {
   MAX_GENERATE_IMAGE_COUNT,
   MIN_GENERATE_IMAGE_COUNT,
 } from "@/lib/generation/types";
+import { MAX_PROJECT_GENERATIONS } from "@/lib/images/constants";
 import {
   createGenerationRunLogger,
   LoggingModelProvider,
@@ -112,6 +118,19 @@ export async function POST(request: Request) {
 
     await getProject(user.id, projectId);
 
+    if ((await countProjectGenerations(user.id, projectId)) >= MAX_PROJECT_GENERATIONS) {
+      return fail(
+        `You can keep up to ${MAX_PROJECT_GENERATIONS} generation batches. Delete a batch to generate more.`,
+        400,
+      );
+    }
+
+    const parentValue = formData.get("parentGenerationId");
+    const parentGenerationId =
+      typeof parentValue === "string" && parentValue.trim().length > 0
+        ? parentValue.trim()
+        : undefined;
+
     const examples =
       analyzerId === "noop"
         ? []
@@ -164,16 +183,17 @@ export async function POST(request: Request) {
 
     activeRun.markSuccess();
 
-    await saveGenerationToProject(user.id, projectId, {
+    const generation = await saveGenerationToProject(user.id, projectId, {
       prompt,
       modelId,
       analyzerId,
       analysisModelId,
       styleHint: result.styleHint,
       images: result.images,
+      parentGenerationId,
     });
 
-    return Response.json(result);
+    return Response.json({ generation });
   } catch (error) {
     run?.markError(safeErrorMessage(error));
 
@@ -182,6 +202,12 @@ export async function POST(request: Request) {
     }
     if (error instanceof ProjectNotFoundError) {
       return Response.json({ error: error.message }, { status: 404 });
+    }
+    if (error instanceof GenerationNotFoundError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+    if (error instanceof GenerationLimitError) {
+      return Response.json({ error: error.message }, { status: 400 });
     }
     if (error instanceof GenerationClientError) {
       return Response.json({ error: error.message }, { status: 400 });

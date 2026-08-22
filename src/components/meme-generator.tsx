@@ -10,13 +10,10 @@ import {
 } from "react";
 import { AnalyzerHelp } from "@/components/analyzer-help";
 import { FeedImport } from "@/components/feed-import";
+import { GenerationBatchList } from "@/components/generation-batch-list";
 import { ResultInspector } from "@/components/result-inspector";
 import { authClient } from "@/lib/auth-client";
-import {
-  compressImageFile,
-  compressResultDataUrls,
-  dataUrlToFile,
-} from "@/lib/images/compress-client";
+import { compressImageFile, dataUrlToFile } from "@/lib/images/compress-client";
 import { MAX_PROJECT_EXAMPLES } from "@/lib/images/constants";
 import {
   type AnalyzerCatalogEntry,
@@ -25,6 +22,7 @@ import {
   type GenerationModel,
   MAX_GENERATE_IMAGE_COUNT,
   MIN_GENERATE_IMAGE_COUNT,
+  type ProjectGeneration,
   type ProjectSnapshot,
   type ProviderId,
   type StoredExample,
@@ -250,7 +248,10 @@ export function MemeGenerator({
   const analyzerIdRef = useRef(initialSnapshot?.analyzerId || "noop");
   const analysisModelIdRef = useRef(initialSnapshot?.analysisModelId ?? "");
   const styleHintRef = useRef(initialSnapshot?.styleHint ?? "");
-  const resultImagesRef = useRef(initialSnapshot?.images ?? []);
+  const generationsRef = useRef(initialSnapshot?.generations ?? []);
+  const selectedGenerationIdRef = useRef(
+    initialSnapshot?.selectedGenerationId ?? null,
+  );
   const selectedIndexRef = useRef(initialSnapshot?.selectedIndex ?? null);
   const updateTextRef = useRef(initialSnapshot?.updateText ?? "");
   const onSavedRef = useRef(onSaved);
@@ -258,6 +259,7 @@ export function MemeGenerator({
   const debounceRef = useRef<number | null>(null);
   const pendingUploadsRef = useRef(0);
   const mountedRef = useRef(true);
+  const inspectorRef = useRef<HTMLDivElement>(null);
 
   const [examples, setExamples] = useState<ExampleImage[]>(() =>
     examplesFromSnapshot(initialSnapshot),
@@ -284,9 +286,12 @@ export function MemeGenerator({
   const [isGenerating, setIsGenerating] = useState(false);
   const [isModifying, setIsModifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resultImages, setResultImages] = useState<string[]>(
-    initialSnapshot?.images ?? [],
+  const [generations, setGenerations] = useState<ProjectGeneration[]>(
+    initialSnapshot?.generations ?? [],
   );
+  const [selectedGenerationId, setSelectedGenerationId] = useState<
+    string | null
+  >(initialSnapshot?.selectedGenerationId ?? null);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(
     initialSnapshot?.selectedIndex ?? null,
   );
@@ -305,7 +310,8 @@ export function MemeGenerator({
     analyzerIdRef.current = selectedAnalyzerId;
     analysisModelIdRef.current = selectedAnalysisModelId;
     styleHintRef.current = styleHint;
-    resultImagesRef.current = resultImages;
+    generationsRef.current = generations;
+    selectedGenerationIdRef.current = selectedGenerationId;
     selectedIndexRef.current = selectedIndex;
     updateTextRef.current = updateText;
     onSavedRef.current = onSaved;
@@ -319,33 +325,13 @@ export function MemeGenerator({
     }
 
     const generation = ++saveGenerationRef.current;
-    const images = keepalive
-      ? resultImagesRef.current
-      : await compressResultDataUrls(resultImagesRef.current);
-    if (
-      generation !== saveGenerationRef.current ||
-      projectIdRef.current !== activeProjectId
-    ) {
-      return;
-    }
-
-    if (images !== resultImagesRef.current) {
-      const changed = images.some(
-        (image, index) => image !== resultImagesRef.current[index],
-      );
-      if (changed) {
-        resultImagesRef.current = images;
-        setResultImages(images);
-      }
-    }
-
     const payload = {
       prompt: promptRef.current,
       modelId: modelIdRef.current,
       analyzerId: analyzerIdRef.current,
       analysisModelId: analysisModelIdRef.current || null,
       styleHint: styleHintRef.current,
-      images: resultImagesRef.current,
+      selectedGenerationId: selectedGenerationIdRef.current,
       selectedIndex: selectedIndexRef.current,
       updateText: updateTextRef.current,
     };
@@ -505,7 +491,7 @@ export function MemeGenerator({
     selectedAnalyzerId,
     selectedAnalysisModelId,
     styleHint,
-    resultImages,
+    selectedGenerationId,
     selectedIndex,
     updateText,
     persist,
@@ -583,8 +569,13 @@ export function MemeGenerator({
     !imageProviderConfigured ||
     !analysisProviderConfigured ||
     imageCountOverMax;
+  const selectedGeneration = generations.find(
+    (entry) => entry.id === selectedGenerationId,
+  );
   const selectedImage =
-    selectedIndex !== null ? resultImages[selectedIndex] : undefined;
+    selectedGeneration && selectedIndex !== null
+      ? selectedGeneration.images[selectedIndex]?.url
+      : undefined;
   const modifyDisabled =
     updateText.trim().length === 0 ||
     requestInFlight ||
@@ -592,9 +583,21 @@ export function MemeGenerator({
     !analysisProviderConfigured;
 
   const closeInspector = useCallback(() => {
+    selectedGenerationIdRef.current = null;
     selectedIndexRef.current = null;
+    setSelectedGenerationId(null);
     setSelectedIndex(null);
   }, []);
+
+  useEffect(() => {
+    if (!selectedImage) {
+      return;
+    }
+    inspectorRef.current?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [selectedImage, selectedGenerationId, selectedIndex]);
 
   function waitForPendingUploads(): Promise<void> {
     if (pendingUploadsRef.current <= 0) {
@@ -782,10 +785,7 @@ export function MemeGenerator({
       });
   }
 
-  async function postGenerate(formData: FormData): Promise<{
-    images: string[];
-    styleHint: string;
-  }> {
+  async function postGenerate(formData: FormData): Promise<ProjectGeneration> {
     if (projectId) {
       formData.set("projectId", projectId);
     }
@@ -796,8 +796,7 @@ export function MemeGenerator({
     });
 
     const data = (await response.json()) as {
-      images?: string[];
-      styleHint?: string;
+      generation?: ProjectGeneration;
       error?: string;
     };
 
@@ -805,14 +804,11 @@ export function MemeGenerator({
       throw new Error(data.error || `Request failed with ${response.status}`);
     }
 
-    if (!data.images?.length) {
+    if (!data.generation?.images.length) {
       throw new Error("No images were returned.");
     }
 
-    return {
-      images: data.images,
-      styleHint: data.styleHint ?? "",
-    };
+    return data.generation;
   }
 
   function appendExperimentFields(formData: FormData) {
@@ -822,17 +818,23 @@ export function MemeGenerator({
     formData.set("count", String(resolveGenerateImageCount(imageCount)));
   }
 
-  async function applyGeneratedResult(result: {
-    images: string[];
-    styleHint: string;
-  }, selectedIndexValue: number | null) {
-    const images = await compressResultDataUrls(result.images);
-    resultImagesRef.current = images;
-    styleHintRef.current = result.styleHint;
+  async function applyGeneratedResult(
+    generation: ProjectGeneration,
+    selectedIndexValue: number | null,
+  ) {
+    const next = [
+      generation,
+      ...generationsRef.current.filter((entry) => entry.id !== generation.id),
+    ];
+    generationsRef.current = next;
+    styleHintRef.current = generation.styleHint;
+    selectedGenerationIdRef.current =
+      selectedIndexValue === null ? null : generation.id;
     selectedIndexRef.current = selectedIndexValue;
     updateTextRef.current = "";
-    setResultImages(images);
-    setStyleHint(result.styleHint);
+    setGenerations(next);
+    setStyleHint(generation.styleHint);
+    setSelectedGenerationId(selectedGenerationIdRef.current);
     setSelectedIndex(selectedIndexValue);
     setUpdateText("");
     await persist();
@@ -866,11 +868,12 @@ export function MemeGenerator({
   }
 
   async function handleModify() {
-    if (modifyDisabled || selectedIndex === null) {
+    if (modifyDisabled || selectedGenerationId === null || selectedIndex === null) {
       return;
     }
 
-    const selectedResult = resultImages[selectedIndex];
+    const selectedResult =
+      selectedGeneration?.images[selectedIndex]?.url;
     if (!selectedResult) {
       return;
     }
@@ -883,6 +886,7 @@ export function MemeGenerator({
       const formData = new FormData();
       formData.set("prompt", updateText.trim());
       appendExperimentFields(formData);
+      formData.set("parentGenerationId", selectedGenerationId);
       formData.set(
         "source",
         await dataUrlToFile(selectedResult, `meme-${selectedIndex + 1}.jpg`),
@@ -900,12 +904,55 @@ export function MemeGenerator({
     }
   }
 
-  function toggleResult(index: number) {
-    setSelectedIndex((current) => {
-      const next = current === index ? null : index;
-      selectedIndexRef.current = next;
-      return next;
-    });
+  function toggleResult(generationId: string, index: number) {
+    const same =
+      selectedGenerationIdRef.current === generationId &&
+      selectedIndexRef.current === index;
+    const nextGenerationId = same ? null : generationId;
+    const nextIndex = same ? null : index;
+    selectedGenerationIdRef.current = nextGenerationId;
+    selectedIndexRef.current = nextIndex;
+    setSelectedGenerationId(nextGenerationId);
+    setSelectedIndex(nextIndex);
+  }
+
+  function deleteGeneration(generationId: string) {
+    const next = generationsRef.current.filter(
+      (entry) => entry.id !== generationId,
+    );
+    generationsRef.current = next;
+    setGenerations(next);
+
+    if (selectedGenerationIdRef.current === generationId) {
+      selectedGenerationIdRef.current = null;
+      selectedIndexRef.current = null;
+      setSelectedGenerationId(null);
+      setSelectedIndex(null);
+    }
+
+    const activeProjectId = projectIdRef.current;
+    if (!activeProjectId) {
+      return;
+    }
+
+    void fetch(
+      `/api/projects/${activeProjectId}/generations/${generationId}`,
+      { method: "DELETE" },
+    )
+      .then(async (response) => {
+        if (!response.ok) {
+          const data = (await response.json()) as { error?: string };
+          throw new Error(data.error || "Could not delete generation.");
+        }
+        onSavedRef.current?.();
+      })
+      .catch((deleteError: unknown) => {
+        setError(
+          deleteError instanceof Error
+            ? deleteError.message
+            : "Could not delete generation.",
+        );
+      });
   }
 
   const handleImported = useCallback((saved: StoredExample[]) => {
@@ -926,16 +973,11 @@ export function MemeGenerator({
     onSavedRef.current?.();
   }, []);
 
-  const layoutClass = selectedImage
-    ? "grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]"
-    : undefined;
-  const formClass = selectedImage
-    ? "grid gap-6 lg:col-span-2 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]"
-    : "grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]";
-
   return (
-    <div className={layoutClass}>
-      <form onSubmit={handleGenerate} className={formClass}>
+    <form
+      onSubmit={handleGenerate}
+      className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]"
+    >
         <section className="rounded-xl border border-panel-edge bg-panel p-5">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
@@ -1216,46 +1258,57 @@ export function MemeGenerator({
             </button>
           </section>
 
-          <section className="flex-1 rounded-xl border border-panel-edge bg-panel p-5">
+          <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-panel-edge bg-panel p-5">
             <h2 className="font-display text-2xl tracking-wide text-accent">
               Result
             </h2>
             <p className="mt-1 text-sm text-muted">
               Generated images will show up here.
             </p>
-            <div className="mt-4 min-h-32 rounded-xl border border-dashed border-panel-edge bg-background px-4 py-6">
+            {selectedImage && selectedIndex !== null ? (
+              <div ref={inspectorRef} className="mt-4">
+                <ResultInspector
+                  image={selectedImage}
+                  index={selectedIndex}
+                  updateText={updateText}
+                  onUpdateTextChange={(value) => {
+                    updateTextRef.current = value;
+                    setUpdateText(value);
+                  }}
+                  onModify={() => {
+                    void handleModify();
+                  }}
+                  onClose={closeInspector}
+                  isModifying={isModifying}
+                  modifyDisabled={modifyDisabled}
+                />
+              </div>
+            ) : null}
+            <div
+              className={`min-h-32 overflow-y-auto rounded-xl border border-dashed border-panel-edge bg-background px-4 py-6 ${
+                selectedImage
+                  ? "mt-4 max-h-[min(40vh,22rem)]"
+                  : "mt-4 max-h-[min(70vh,40rem)]"
+              }`}
+            >
               {error ? (
                 <p className="text-sm text-red-300">{error}</p>
               ) : null}
-              {resultImages.length > 0 ? (
-                <ul
-                  className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${error ? "mt-4" : ""}`}
-                >
-                  {resultImages.map((image, index) => {
-                    const selected = selectedIndex === index;
-                    return (
-                      <li key={`${index}-${image.slice(0, 32)}`}>
-                        <button
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() => toggleResult(index)}
-                          className={`w-full overflow-hidden rounded-lg border bg-background ${
-                            selected
-                              ? "border-accent ring-1 ring-accent/60"
-                              : "border-panel-edge"
-                          }`}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={image}
-                            alt={`Generated meme ${index + 1}`}
-                            className="aspect-square w-full object-cover"
-                          />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+              {generations.length > 0 ? (
+                <div className={error ? "mt-4" : undefined}>
+                  <GenerationBatchList
+                    generations={generations}
+                    selectedGenerationId={selectedGenerationId}
+                    selectedIndex={selectedIndex}
+                    analyzers={config?.analyzers ?? []}
+                    models={config?.models ?? []}
+                    analysisModels={config?.analysisModels ?? []}
+                    onSelect={toggleResult}
+                    onDelete={deleteGeneration}
+                    deleteDisabled={requestInFlight}
+                    compact={Boolean(selectedImage)}
+                  />
+                </div>
               ) : error || !cacheReady ? null : (
                 <p className="text-sm text-muted">
                   Upload examples, write a prompt, then hit generate.
@@ -1265,24 +1318,5 @@ export function MemeGenerator({
           </section>
         </div>
       </form>
-
-      {selectedImage && selectedIndex !== null && (
-        <ResultInspector
-          image={selectedImage}
-          index={selectedIndex}
-          updateText={updateText}
-          onUpdateTextChange={(value) => {
-            updateTextRef.current = value;
-            setUpdateText(value);
-          }}
-          onModify={() => {
-            void handleModify();
-          }}
-          onClose={closeInspector}
-          isModifying={isModifying}
-          modifyDisabled={modifyDisabled}
-        />
-      )}
-    </div>
   );
 }
