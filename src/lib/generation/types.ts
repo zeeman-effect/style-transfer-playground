@@ -19,14 +19,32 @@ export type StoredExample = {
   previewUrl: string;
 };
 
+export type ProjectGenerationImage = {
+  id: string;
+  url: string;
+};
+
+export type ProjectGeneration = {
+  id: string;
+  createdAt: number;
+  prompt: string;
+  modelId: string;
+  analyzerId: string;
+  analysisModelId: string | null;
+  styleHint: string;
+  parentGenerationId: string | null;
+  images: ProjectGenerationImage[];
+};
+
 export type ProjectSnapshot = {
   prompt: string;
   modelId: string;
   analyzerId: string;
   analysisModelId: string | null;
   styleHint: string;
-  images: string[];
+  generations: ProjectGeneration[];
   examples: StoredExample[];
+  selectedGenerationId: string | null;
   selectedIndex: number | null;
   updateText: string;
 };

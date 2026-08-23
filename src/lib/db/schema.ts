@@ -163,6 +163,7 @@ export const project = sqliteTable(
     examples: text("examples_json", { mode: "json" })
       .$type<StoredExample[]>()
       .notNull(),
+    selectedGenerationId: text("selected_generation_id"),
     selectedIndex: integer("selected_index"),
     updateText: text("update_text").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
@@ -191,6 +192,57 @@ export const projectExample = sqliteTable(
   (table) => [
     index("project_example_projectId_sortOrder_idx").on(
       table.projectId,
+      table.sortOrder,
+    ),
+  ],
+);
+
+export const projectGeneration = sqliteTable(
+  "project_generation",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    prompt: text("prompt").notNull(),
+    modelId: text("model_id").notNull(),
+    analyzerId: text("analyzer_id").notNull(),
+    analysisModelId: text("analysis_model_id"),
+    styleHint: text("style_hint").notNull(),
+    parentGenerationId: text("parent_generation_id"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [
+    index("project_generation_projectId_createdAt_idx").on(
+      table.projectId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const projectGenerationImage = sqliteTable(
+  "project_generation_image",
+  {
+    id: text("id").primaryKey(),
+    generationId: text("generation_id")
+      .notNull()
+      .references(() => projectGeneration.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => project.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    mimeType: text("mime_type").notNull(),
+    payload: blob("payload", { mode: "buffer" }).notNull(),
+    sortOrder: integer("sort_order").notNull(),
+  },
+  (table) => [
+    index("project_generation_image_generationId_sortOrder_idx").on(
+      table.generationId,
       table.sortOrder,
     ),
   ],

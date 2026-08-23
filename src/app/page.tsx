@@ -10,13 +10,7 @@ export default async function Home() {
     <main className="flex-1">
       <Suspense
         fallback={
-          <div
-            className={
-              signedIn
-                ? "mx-auto flex w-full max-w-[88rem] flex-1 gap-6 px-6 py-8 sm:px-10"
-                : "mx-auto w-full max-w-7xl flex-1 px-6 py-8 sm:px-10"
-            }
-          />
+          <div className="mx-auto w-full max-w-[88rem] flex-1 px-6 py-8 sm:px-10" />
         }
       >
         <Playground initialSignedIn={signedIn} />

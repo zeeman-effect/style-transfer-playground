@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Oswald } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { ProjectChromeProvider } from "@/components/project-chrome";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
@@ -32,8 +33,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${oswald.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <SiteHeader />
-        {children}
+        <ProjectChromeProvider>
+          <SiteHeader />
+          {children}
+        </ProjectChromeProvider>
         <Analytics />
       </body>
     </html>

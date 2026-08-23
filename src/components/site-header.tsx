@@ -4,6 +4,8 @@ import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { useProjectChrome } from "@/components/project-chrome";
+import { ProjectMenu } from "@/components/project-menu";
 
 const subscribeHydrated = () => () => {};
 
@@ -29,6 +31,7 @@ export function SiteHeader() {
 function AccountControls() {
   const pathname = usePathname();
   const router = useRouter();
+  const projectChrome = useProjectChrome();
   const { data: session, isPending } = authClient.useSession();
   const sessionReady = useSyncExternalStore(
     subscribeHydrated,
@@ -63,6 +66,7 @@ function AccountControls() {
           <span className="max-w-40 truncate text-sm text-muted">
             {session.user.name || session.user.email}
           </span>
+          {projectChrome ? <ProjectMenu {...projectChrome} /> : null}
           <Link
             href={pathname === "/settings" ? "/" : "/settings"}
             className={buttonClass}
