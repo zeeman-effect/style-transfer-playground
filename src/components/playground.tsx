@@ -44,6 +44,7 @@ export function Playground({ initialSignedIn = false }: PlaygroundProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<ProjectRecord | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export function Playground({ initialSignedIn = false }: PlaygroundProps) {
   useEffect(() => {
     if (!signedIn) {
       bootstrappedRef.current = false;
+      setReady(false);
     }
   }, [signedIn]);
 
@@ -92,6 +94,7 @@ export function Playground({ initialSignedIn = false }: PlaygroundProps) {
 
     async function bootstrap() {
       setError(null);
+      setBusy(true);
       try {
         const response = await fetch("/api/projects");
         const data = (await response.json()) as {
@@ -115,8 +118,9 @@ export function Playground({ initialSignedIn = false }: PlaygroundProps) {
         if (cancelled) {
           return;
         }
-        bootstrappedRef.current = true;
-        applyActiveProject(selectedId, project);
+        if (!activeIdRef.current) {
+          applyActiveProject(selectedId, project);
+        }
       } catch (loadError) {
         if (!cancelled) {
           setError(
@@ -124,6 +128,12 @@ export function Playground({ initialSignedIn = false }: PlaygroundProps) {
               ? loadError.message
               : "Could not load projects.",
           );
+        }
+      } finally {
+        if (!cancelled) {
+          bootstrappedRef.current = true;
+          setReady(true);
+          setBusy(false);
         }
       }
     }
@@ -316,7 +326,7 @@ export function Playground({ initialSignedIn = false }: PlaygroundProps) {
     return {
       projects,
       selectedId: activeId,
-      disabled: busy,
+      disabled: busy || !ready,
       onSelect: (id) => {
         void selectProject(id);
       },
@@ -330,7 +340,7 @@ export function Playground({ initialSignedIn = false }: PlaygroundProps) {
         void deleteProject(id);
       },
     };
-  }, [signedIn, projects, activeId, busy]);
+  }, [signedIn, projects, activeId, busy, ready]);
 
   useRegisterProjectChrome(projectChrome);
 

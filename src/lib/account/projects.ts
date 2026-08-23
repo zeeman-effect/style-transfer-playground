@@ -268,14 +268,18 @@ export async function listProjects(userId: string): Promise<ProjectListResult> {
         updateText: "",
       });
       if (generation.images.length > 0) {
-        await createProjectGeneration(userId, created.id, {
-          prompt: generation.prompt,
-          modelId: generation.modelId,
-          analyzerId: generation.analyzerId,
-          analysisModelId: generation.analysisModelId ?? null,
-          styleHint: generation.styleHint,
-          images: generation.images,
-        });
+        try {
+          await backfillLegacyGeneration(userId, created.id, {
+            prompt: generation.prompt,
+            modelId: generation.modelId,
+            analyzerId: generation.analyzerId,
+            analysisModelId: generation.analysisModelId ?? null,
+            styleHint: generation.styleHint,
+            images: generation.images,
+          });
+        } catch {
+          // Keep the new project listable if legacy images cannot be stored.
+        }
       }
     } else {
       await insertProject(userId, "Untitled", EMPTY_SNAPSHOT);

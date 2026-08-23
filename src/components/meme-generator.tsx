@@ -917,13 +917,18 @@ export function MemeGenerator({
   }
 
   function deleteGeneration(generationId: string) {
-    const next = generationsRef.current.filter(
-      (entry) => entry.id !== generationId,
-    );
+    if (!window.confirm("Delete this generation batch?")) {
+      return;
+    }
+
+    const previous = generationsRef.current;
+    const previousSelectedId = selectedGenerationIdRef.current;
+    const previousSelectedIndex = selectedIndexRef.current;
+    const next = previous.filter((entry) => entry.id !== generationId);
     generationsRef.current = next;
     setGenerations(next);
 
-    if (selectedGenerationIdRef.current === generationId) {
+    if (previousSelectedId === generationId) {
       selectedGenerationIdRef.current = null;
       selectedIndexRef.current = null;
       setSelectedGenerationId(null);
@@ -947,6 +952,12 @@ export function MemeGenerator({
         onSavedRef.current?.();
       })
       .catch((deleteError: unknown) => {
+        generationsRef.current = previous;
+        setGenerations(previous);
+        selectedGenerationIdRef.current = previousSelectedId;
+        selectedIndexRef.current = previousSelectedIndex;
+        setSelectedGenerationId(previousSelectedId);
+        setSelectedIndex(previousSelectedIndex);
         setError(
           deleteError instanceof Error
             ? deleteError.message
