@@ -88,6 +88,13 @@ describe("/api/feed-import", () => {
         imported: 1,
         projectId: "proj-1",
       });
+      expect(importMock).toHaveBeenCalledWith(USER.id, "proj-1", {
+        source: "someone",
+        platform: "instagram",
+        count: 4,
+        instagramShortcodes: [],
+        instagramImageUrls: [CDN_URL],
+      });
       expect(completeMock).toHaveBeenCalledWith("abc", examples);
     });
   });
@@ -104,6 +111,7 @@ describe("/api/feed-import", () => {
       const response = await GET(new Request(`${URL}?token=abc`));
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ status: "unknown" });
+      expect(readMock).toHaveBeenCalledWith("abc", USER.id);
     });
 
     it("returns the polled import status", async () => {
@@ -121,6 +129,7 @@ describe("/api/feed-import", () => {
         examples: [{ id: "ex-1" }],
         error: null,
       });
+      expect(readMock).toHaveBeenCalledWith("abc", USER.id);
     });
   });
 

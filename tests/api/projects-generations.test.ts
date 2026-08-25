@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DELETE } from "@/app/api/projects/[id]/generations/[gid]/route";
-import { deleteProjectGeneration } from "@/lib/account/generations";
+import { ProjectNotFoundError } from "@/lib/account/errors";
+import {
+  deleteProjectGeneration,
+  GenerationNotFoundError,
+} from "@/lib/account/generations";
 import { AuthRequiredError, requireUser } from "@/lib/auth/session";
 import { routeParams, USER } from "./helpers";
 
@@ -36,5 +40,23 @@ describe("DELETE /api/projects/[id]/generations/[gid]", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
     expect(deleteMock).toHaveBeenCalledWith(USER.id, "proj-1", "gen-1");
+  });
+
+  it("returns 404 when the generation is missing", async () => {
+    deleteMock.mockRejectedValue(new GenerationNotFoundError());
+    const response = await DELETE(
+      new Request(URL, { method: "DELETE" }),
+      params,
+    );
+    expect(response.status).toBe(404);
+  });
+
+  it("returns 404 when the project is missing", async () => {
+    deleteMock.mockRejectedValue(new ProjectNotFoundError());
+    const response = await DELETE(
+      new Request(URL, { method: "DELETE" }),
+      params,
+    );
+    expect(response.status).toBe(404);
   });
 });

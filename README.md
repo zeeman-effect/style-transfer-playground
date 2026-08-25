@@ -31,6 +31,15 @@ npm run dev
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000).
 
+## Tests
+
+```bash
+npm test          # watch mode
+npm run test:run  # single run (CI)
+```
+
+GitHub Actions runs `npm run test:run` on pull requests and pushes to `master`.
+
 ## Using the app
 
 First-time flow after the app is running: sign in with Google, save provider keys in Settings, add example images (upload or pull from Instagram/X), then generate.

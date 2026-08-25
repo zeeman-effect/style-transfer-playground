@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/projects/[id]/examples/[eid]/image/route";
-import { getProjectExampleImage } from "@/lib/account/examples";
+import {
+  ExampleNotFoundError,
+  getProjectExampleImage,
+} from "@/lib/account/examples";
+import { ProjectNotFoundError } from "@/lib/account/errors";
 import { AuthRequiredError, requireUser } from "@/lib/auth/session";
 import { routeParams, USER } from "./helpers";
 
@@ -32,11 +36,27 @@ describe("GET /api/projects/[id]/examples/[eid]/image", () => {
 
   it("returns image bytes and content-type", async () => {
     const bytes = new Uint8Array([137, 80, 78, 71]);
-    imageMock.mockResolvedValue({ bytes, mimeType: "image/png" });
+    imageMock.mockResolvedValue({
+      bytes,
+      mimeType: "image/png",
+      name: "example.png",
+    });
     const response = await GET(new Request(URL), params);
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toBe("image/png");
     expect(new Uint8Array(await response.arrayBuffer())).toEqual(bytes);
     expect(imageMock).toHaveBeenCalledWith(USER.id, "proj-1", "ex-1");
+  });
+
+  it("returns 404 when the example is missing", async () => {
+    imageMock.mockRejectedValue(new ExampleNotFoundError());
+    const response = await GET(new Request(URL), params);
+    expect(response.status).toBe(404);
+  });
+
+  it("returns 404 when the project is missing", async () => {
+    imageMock.mockRejectedValue(new ProjectNotFoundError());
+    const response = await GET(new Request(URL), params);
+    expect(response.status).toBe(404);
   });
 });

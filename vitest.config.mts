@@ -18,6 +18,10 @@ export default defineConfig({
           new URL("./tests/mocks/auth.ts", import.meta.url),
         ),
       },
+      {
+        find: /^@\//,
+        replacement: fileURLToPath(new URL("./src/", import.meta.url)),
+      },
     ],
   },
   test: {

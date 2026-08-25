@@ -5,7 +5,7 @@ import type { GeneratedImage } from "@/lib/generation/types";
 export function makeFile(
   name = "example.png",
   type = "image/png",
-  bytes: Uint8Array = new Uint8Array([1, 2, 3]),
+  bytes: Uint8Array<ArrayBuffer> = new Uint8Array([1, 2, 3]),
 ): File {
   return new File([bytes], name, { type });
 }
